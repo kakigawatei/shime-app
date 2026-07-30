@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="締めアプリ">
+<meta name="theme-color" content="#2f6f5e">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>締めアプリ｜柿川亭×アブララボ</title>
+<style>
+  :root{
+    --sab: min(env(safe-area-inset-bottom, 0px), 34px);
+    --sat: env(safe-area-inset-top, 0px);
+    --bg:#f4f1ea; --paper:#fffdf8; --ink:#2b2b2b; --sub:#7a756c;
+    --line:#e6e0d4; --brand:#2f6f5e; --brand-d:#245646; --accent:#c8632b;
+    --kaki:#c8632b; --abura:#2f6f5e; --ok:#2f8f5e; --warn:#c23b3b;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; height:100dvh; overflow:hidden; overscroll-behavior:none;
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+    color:var(--ink); background:var(--bg);}
+  #app{height:100dvh; display:flex; flex-direction:column; max-width:520px; margin:0 auto; background:var(--bg);}
+  header{flex-shrink:0; padding:calc(var(--sat) + 8px) 12px 8px; background:var(--brand); color:#fff;}
+  .htop{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .htitle{font-weight:700; font-size:15px;}
+  .hname{font-size:12px; opacity:.9; background:rgba(255,255,255,.15); padding:4px 10px; border-radius:14px;}
+  .stabs{display:flex; gap:6px; margin-top:8px;}
+  .stab{flex:1; text-align:center; padding:8px; border-radius:10px; font-weight:700; font-size:14px;
+    background:rgba(255,255,255,.15); color:#fff; border:0; cursor:pointer;}
+  .stab.on[data-s="kaki"]{background:#fff; color:var(--kaki);}
+  .stab.on[data-s="abura"]{background:#fff; color:var(--abura);}
+  main{flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:12px 12px calc(80px + var(--sab));}
+  nav{flex-shrink:0; position:fixed; bottom:0; left:0; width:100%; max-width:520px; left:50%; transform:translateX(-50%);
+    display:flex; background:var(--paper); border-top:1px solid var(--line);
+    padding-bottom:var(--sab);}
+  nav button{flex:1; border:0; background:none; padding:8px 2px; font-size:11px; color:var(--sub); cursor:pointer; font-weight:600;}
+  nav button .ic{display:block; font-size:20px; line-height:1.1;}
+  nav button.on{color:var(--brand);}
+  h2.sc{font-size:16px; margin:2px 0 12px;}
+  .muted{color:var(--sub); font-size:13px;}
+  .card{background:var(--paper); border:1px solid var(--line); border-radius:14px; margin-bottom:10px; overflow:hidden;}
+  .card-h{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 14px; cursor:pointer;}
+  .card-h .nm{font-weight:700;}
+  .chip{font-size:11px; padding:2px 8px; border-radius:10px; background:#eef0ee; color:var(--sub); font-weight:700;}
+  .chip.sms{background:#e5f0ff; color:#2b6cd0;}
+  .chip.email{background:#fdeede; color:#b26a1c;}
+  .chip.line{background:#e4f6e4; color:#2a8a2a;}
+  .chip.messenger{background:# eae4ff; color:#6a3fd0;}
+  .chip.sent{background:#dff2e5; color:var(--ok);}
+  .card-b{padding:0 14px 14px; display:none;}
+  .card.open .card-b{display:block;}
+  .item{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 0; border-top:1px dashed var(--line);}
+  .item .inm{font-size:14px;}
+  .item .iunit{color:var(--sub); font-size:12px; margin-left:2px;}
+  .stepper{display:flex; align-items:center; gap:8px;}
+  .stepper button{width:32px; height:32px; border-radius:8px; border:1px solid var(--line); background:#fff; font-size:18px; cursor:pointer; color:var(--brand);}
+  .stepper .qv{min-width:22px; text-align:center; font-weight:700;}
+  .split{font-size:12px; color:var(--accent); margin-top:2px; cursor:pointer; display:inline-block;}
+  .splitrow{display:none; align-items:center; gap:6px; font-size:12px; color:var(--sub); padding:4px 0 0 2px;}
+  .splitrow.on{display:flex;}
+  .splitrow input{width:44px; padding:4px; border:1px solid var(--line); border-radius:6px; text-align:center;}
+  .prev{margin-top:12px;}
+  .prev label{font-size:12px; color:var(--sub); display:block; margin-bottom:4px;}
+  textarea.msg{width:100%; min-height:120px; border:1px solid var(--line); border-radius:10px; padding:10px; font-size:14px; font-family:inherit; line-height:1.5; resize:vertical; background:#fff; color:var(--ink);}
+  .btns{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;}
+  .btn{flex:1; min-width:120px; text-align:center; padding:12px; border-radius:10px; border:0; font-weight:700; font-size:14px; cursor:pointer; text-decoration:none; display:inline-block;}
+  .btn.p{background:var(--brand); color:#fff;}
+  .btn.s{background:#eef0ee; color:var(--ink);}
+  .btn.g{background:#f0ede6; color:var(--sub);}
+  .btn.done{background:var(--ok); color:#fff;}
+  .daterow{display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;}
+  .daterow button{padding:8px 12px; border-radius:20px; border:1px solid var(--line); background:#fff; font-size:13px; cursor:pointer; font-weight:600;}
+  .daterow button.on{background:var(--brand); color:#fff; border-color:var(--brand);}
+  .field{margin-bottom:10px;}
+  .field label{font-size:12px; color:var(--sub); display:block; margin-bottom:3px;}
+  .field input,.field select{width:100%; padding:10px; border:1px solid var(--line); border-radius:9px; font-size:14px; font-family:inherit; background:#fff; color:var(--ink);}
+  .row2{display:flex; gap:8px;}
+  .row2>*{flex:1;}
+  .additem{display:flex; gap:6px; margin-top:8px;}
+  .additem input{flex:1; padding:8px; border:1px solid var(--line); border-radius:8px;}
+  .additem button{padding:8px 12px; border-radius:8px; border:0; background:var(--brand); color:#fff; font-weight:700; cursor:pointer;}
+  .check{display:flex; align-items:center; gap:10px; padding:11px 4px; border-bottom:1px solid var(--line);}
+  .check input{width:22px; height:22px;}
+  .check .txt{flex:1; font-size:15px;}
+  .check.done .txt{text-decoration:line-through; color:var(--sub);}
+  .check .who{font-size:11px; color:var(--sub);}
+  .step{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--line);}
+  .step:last-child{border-bottom:0;}
+  .step.soon{opacity:.5;}
+  .step .badge{font-size:11px; padding:3px 9px; border-radius:10px; background:#eef0ee; color:var(--sub); font-weight:700;}
+  .step .badge.done{background:#dff2e5; color:var(--ok);}
+  .hint{font-size:12px; color:var(--sub); background:#faf7f0; border:1px dashed var(--line); border-radius:10px; padding:10px; margin-bottom:12px;}
+  .modal{position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; align-items:center; justify-content:center; padding:20px; z-index:50;}
+  .modal.on{display:flex;}
+  .modal .box{background:var(--paper); border-radius:16px; padding:20px; width:100%; max-width:360px;}
+  .modal h3{margin:0 0 12px; font-size:16px;}
+  .del{color:var(--warn); font-size:12px; cursor:pointer; background:none; border:0;}
+  .hist{padding:11px 0; border-bottom:1px solid var(--line); font-size:13px;}
+  .hist .meta{color:var(--sub); font-size:11px; margin-bottom:3px;}
+  .hist pre{white-space:pre-wrap; font-family:inherit; margin:0; font-size:13px;}
+  .toast{position:fixed; bottom:calc(80px + var(--sab)); left:50%; transform:translateX(-50%); background:#333; color:#fff; padding:10px 18px; border-radius:20px; font-size:13px; opacity:0; transition:opacity .2s; z-index:60; pointer-events:none;}
+  .toast.on{opacity:.95;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="htop">
+      <div class="htitle">締めアプリ</div>
+      <div class="hname" id="hname" onclick="askName()">担当: -</div>
+    </div>
+    <div class="stabs">
+      <button class="stab on" data-s="kaki" onclick="setStore('kaki')">柿川亭</button>
+      <button class="stab" data-s="abura" onclick="setStore('abura')">アブララボ</button>
+    </div>
+  </header>
+  <main id="main"></main>
+  <nav>
+    <button data-v="shime" class="on" onclick="go('shime')"><span class="ic">✅</span>締め</button>
+    <button data-v="order" onclick="go('order')"><span class="ic">📤</span>発注</button>
+    <button data-v="master" onclick="go('master')"><span class="ic">🗂️</span>マスタ</button>
+    <button data-v="shop" onclick="go('shop')"><span class="ic">🛒</span>買い出し</button>
+  </nav>
+</div>
+<div class="modal" id="modal"><div class="box" id="modalbox"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+ * 締めアプリ Phase1（発注MVP） — localStorage版（この端末に保存）
+ * 次段階で Firebase(kakigawatei-franchise) 共有に差し替え予定。
+ * データ入出力は store.* に集約してあるので差し替えは局所的。
+ * ============================================================ */
+var STORES = { kaki:{id:"kaki",name:"柿川亭"}, abura:{id:"abura",name:"アブララボ"} };
+var CHANNELS = { sms:"SMS", email:"メール", line:"LINE", messenger:"Messenger" };
+var LS = {
+  suppliers:"shime_suppliers", shopping:"shime_shopping", orders:"shime_orders",
+  name:"shime_name", store:"shime_store"
+};
+var uid = function(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); };
+
+var store = {
+  get:function(k, def){ try{ var v=localStorage.getItem(k); return v?JSON.parse(v):def; }catch(e){ return def; } },
+  set:function(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
+  suppliers:function(){ return store.get(LS.suppliers, null) || seedSuppliers(); },
+  saveSuppliers:function(a){ store.set(LS.suppliers, a); },
+  orders:function(){ return store.get(LS.orders, []); },
+  saveOrders:function(a){ store.set(LS.orders, a); },
+  shopping:function(){ return store.get(LS.shopping, []); },
+  saveShopping:function(a){ store.set(LS.shopping, a); }
+};
+
+function seedSuppliers(){
+  var s = [
+    { id:uid(), name:"めんつう", channel:"sms", contact:"", order:1,
+      items:[ it("太麺","玉"), it("細麺","玉"), it("冷凍12番150g","パック",true), it("冷凍16番太麺","玉") ] },
+    { id:uid(), name:"ホクショク", channel:"sms", contact:"", order:2,
+      items:[ it("豚骨のタレ","本",true), it("柿川亭のタレ","ケース",true), it("メンマ","ケース"), it("にんにく","個") ] },
+    { id:uid(), name:"中越鶏卵", channel:"email", contact:"", order:3,
+      items:[ it("卵","パック") ] },
+    { id:uid(), name:"竹内農園", channel:"line", contact:"", order:4, items:[] },
+    { id:uid(), name:"マルヤマ包装", channel:"line", contact:"", order:5, items:[] },
+    { id:uid(), name:"アルベーロ", channel:"messenger", contact:"", order:6, items:[] }
+  ];
+  store.saveSuppliers(s);
+  return s;
+}
+function it(name, unit, split){ return { id:uid(), name:name, unit:unit||"", split:!!split, order:0 }; }
+
+/* ---------- state ---------- */
+var VIEW = "shime";
+var CUR = store.get(LS.store, "kaki");
+var MYNAME = store.get(LS.name, "");
+var draft = {};   // supplierId -> {deliver:'tomorrow', qty:{itemId:n}, split:{itemId:n}, text:null}
+
+/* ---------- helpers ---------- */
+function el(id){ return document.getElementById(id); }
+function esc(s){ return (s||"").replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function toast(m){ var t=el("toast"); t.textContent=m; t.classList.add("on"); clearTimeout(t._t); t._t=setTimeout(function(){ t.classList.remove("on"); },1600); }
+function storeName(){ return STORES[CUR].name; }
+function otherName(){ return CUR==="kaki" ? STORES.abura.name : STORES.kaki.name; }
+function todayPlus(n){ var d=new Date(); d.setDate(d.getDate()+n); return d; }
+var WD=["日","月","火","水","木","金","土"];
+function deliverLabel(kind){
+  if(kind==="today") return {rel:"本日", d:todayPlus(0)};
+  if(kind==="day2") return {rel:"明後日", d:todayPlus(2)};
+  return {rel:"明日", d:todayPlus(1)};
+}
+
+/* ---------- order text ---------- */
+function buildText(sup){
+  var d = draft[sup.id] || {};
+  var kind = d.deliver || "tomorrow";
+  var dl = deliverLabel(kind);
+  var wd = WD[dl.d.getDay()];
+  var lines = [];
+  lines.push("お世話になっております。");
+  lines.push(dl.rel + wd + "曜日");
+  lines.push(storeName());
+  (sup.items||[]).forEach(function(item){
+    var q = (d.qty && d.qty[item.id]) || 0;
+    if(q>0){
+      var line = item.name + q + (item.unit||"");
+      if(item.split){
+        var sp = (d.split && d.split[item.id]) || 0;
+        if(sp>0) line += "（内"+sp+"は"+otherName()+"）";
+      }
+      lines.push(line);
+    }
+  });
+  lines.push("お願いいたします🙇");
+  return lines.join("\n");
+}
+
+/* ---------- send links ---------- */
+function sendLinks(sup, text){
+  var enc = encodeURIComponent(text);
+  var out = [];
+  if(sup.channel==="sms"){
+    var num = (sup.contact||"").replace(/[^0-9+]/g,"");
+    out.push({label:"SMSを開いて送信", cls:"p", href: num ? ("sms:"+num+"?&body="+enc) : null, need:"携帯番号"});
+  } else if(sup.channel==="email"){
+    var to = sup.contact||"";
+    var subj = encodeURIComponent("発注（"+storeName()+"）");
+    out.push({label:"メールを開いて送信", cls:"p", href: to ? ("mailto:"+to+"?subject="+subj+"&body="+enc) : null, need:"メールアドレス"});
+  } else if(sup.channel==="line"){
+    out.push({label:"LINEを開く（本文入り）", cls:"p", href:"line://msg/text/"+enc, need:null});
+  } else if(sup.channel==="messenger"){
+    out.push({label:"Messengerを開く", cls:"p", href:"fb-messenger://", need:null});
+  }
+  return out;
+}
+
+/* ============================================================
+ * render
+ * ============================================================ */
+function render(){
+  el("hname").textContent = "担当: " + (MYNAME||"未設定");
+  document.querySelectorAll(".stab").forEach(function(b){ b.classList.toggle("on", b.dataset.s===CUR); });
+  document.querySelectorAll("nav button").forEach(function(b){ b.classList.toggle("on", b.dataset.v===VIEW); });
+  var m = el("main");
+  if(VIEW==="shime") m.innerHTML = viewShime();
+  else if(VIEW==="order") m.innerHTML = viewOrder();
+  else if(VIEW==="master") m.innerHTML = viewMaster();
+  else if(VIEW==="shop") m.innerHTML = viewShop();
+  m.scrollTop = 0;
+}
+function go(v){ VIEW=v; render(); }
+function setStore(s){ CUR=s; store.set(LS.store, s); render(); }
+
+/* ----- 締めダッシュボード（骨格・発注のみ稼働） ----- */
+function viewShime(){
+  var d = todayPlus(0);
+  var sups = store.suppliers();
+  var todays = store.orders().filter(function(o){ return o.store===CUR && o.dateKey===dayKey(0); });
+  var sentIds = {}; todays.forEach(function(o){ sentIds[o.supplierId]=o; });
+  var sentCount = sups.filter(function(s){ return sentIds[s.id]; }).length;
+  var rows =
+    step("① 券売機集計","soon","近日") +
+    step("② anydeli集計","soon","近日") +
+    step("③ 客数確認","soon","近日") +
+    step("④ 仕入記録","soon","近日") +
+    '<div class="step"><div>⑤ 発注</div><div class="badge '+(sentCount===sups.length?'done':'')+'">'+sentCount+'/'+sups.length+' 件</div></div>';
+  var list = sups.map(function(s){
+    var o = sentIds[s.id];
+    return '<div class="step"><div>'+(o?'✅ ':'⬜ ')+esc(s.name)+'</div><div class="badge '+(o?'done':'')+'">'+(o?(fmtTime(o.ts)+' '+esc(o.by||'')):'未送信')+'</div></div>';
+  }).join("");
+  return '<h2 class="sc">今日の締め（'+storeName()+' '+ (d.getMonth()+1)+'/'+d.getDate()+' '+WD[d.getDay()]+'）</h2>'
+    + '<div class="hint">まずは <b>発注</b> が使えます。券売機・anydeli・会計は順番に追加していきます。</div>'
+    + '<div class="card">'+rows+'</div>'
+    + '<div class="btns"><button class="btn p" onclick="go(\'order\')">発注をすすめる →</button></div>'
+    + '<h2 class="sc" style="margin-top:18px">今日の発注状況</h2><div class="card">'+list+'</div>'
+    + '<h2 class="sc" style="margin-top:18px">最近の発注履歴</h2>'+ histHtml(8);
+}
+function step(t,cls,badge){ return '<div class="step '+(cls||'')+'"><div>'+t+'</div><div class="badge">'+badge+'</div></div>'; }
+
+/* ----- 発注 ----- */
+function viewOrder(){
+  var sups = store.suppliers();
+  var sentIds = {}; store.orders().filter(function(o){return o.store===CUR&&o.dateKey===dayKey(0);}).forEach(function(o){sentIds[o.supplierId]=o;});
+  var cards = sups.sort(byOrder).map(function(sup){
+    var d = draft[sup.id] || (draft[sup.id]={deliver:"tomorrow",qty:{},split:{}});
+    var sent = sentIds[sup.id];
+    var opened = !sent && sup._open;
+    var items = (sup.items||[]).length ? (sup.items||[]).map(function(item){
+      var q = d.qty[item.id]||0;
+      var splitOn = item.split && d.split[item.id]!=null;
+      return '<div class="item"><div><span class="inm">'+esc(item.name)+'</span><span class="iunit">'+esc(item.unit||"")+'</span>'
+        + (item.split?('<div><span class="split" onclick="toggleSplit(\''+sup.id+'\',\''+item.id+'\')">内訳（'+esc(otherName())+'分）</span>'
+            +'<span class="splitrow'+(splitOn?' on':'')+'" id="sr_'+sup.id+'_'+item.id+'">うち'+esc(otherName())+' <input type="number" min="0" value="'+(d.split[item.id]||0)+'" onchange="setSplit(\''+sup.id+'\',\''+item.id+'\',this.value)"></span></div>'):'')
+        + '</div>'
+        + '<div class="stepper"><button onclick="qty(\''+sup.id+'\',\''+item.id+'\',-1)">−</button><span class="qv" id="q_'+sup.id+'_'+item.id+'">'+q+'</span><button onclick="qty(\''+sup.id+'\',\''+item.id+'\',1)">＋</button></div></div>';
+    }).join("") : '<div class="muted" style="padding:8px 0">品目が未登録です。<a href="#" onclick="go(\'master\');return false;">マスタ管理</a>で追加してください。</div>';
+    var text = d.text!=null ? d.text : buildText(sup);
+    var links = sendLinks(sup, text);
+    var linkBtns = links.map(function(l){
+      if(l.href) return '<a class="btn '+l.cls+'" href="'+l.href+'" onclick="markOpened(\''+sup.id+'\')">'+l.label+'</a>';
+      return '<button class="btn g" onclick="alert(\'マスタで'+l.need+'を登録してください\')">'+l.label+'（'+l.need+'未登録）</button>';
+    }).join("");
+    return '<div class="card'+(opened?' open':'')+'" id="card_'+sup.id+'">'
+      + '<div class="card-h" onclick="toggleCard(\''+sup.id+'\')"><div><span class="nm">'+esc(sup.name)+'</span> <span class="chip '+sup.channel+'">'+CHANNELS[sup.channel]+'</span></div>'
+      + '<span class="chip '+(sent?'sent':'')+'">'+(sent?'✅送信操作済 '+fmtTime(sent.ts):'')+'</span></div>'
+      + '<div class="card-b">'
+      + '<div class="daterow">'+dateBtn(sup.id,"today","本日")+dateBtn(sup.id,"tomorrow","明日")+dateBtn(sup.id,"day2","明後日")+'</div>'
+      + items
+      + '<div class="prev"><label>送信プレビュー（タップで直接編集OK）</label>'
+      + '<textarea class="msg" id="msg_'+sup.id+'" oninput="editText(\''+sup.id+'\',this.value)">'+esc(text)+'</textarea></div>'
+      + '<div class="btns">'+linkBtns
+      + '<button class="btn s" onclick="copyText(\''+sup.id+'\')">本文コピー</button>'
+      + '<button class="btn done" onclick="markSent(\''+sup.id+'\')">送信した✓</button></div>'
+      + '</div></div>';
+  }).join("");
+  return '<h2 class="sc">発注 — '+storeName()+'</h2>'
+    + '<div class="hint">業者ごとに数量を入れて送信。SMS/LINE/メールは本文入りで開くので、最後に送信ボタンを押すだけ。同じ業者にもう一方の店舗ぶんは、上のタブで店舗を切替えてもう一度作れます。</div>'
+    + cards;
+}
+function dateBtn(sid,k,label){ var d=draft[sid]; var on=(d&&d.deliver||"tomorrow")===k; return '<button class="'+(on?'on':'')+'" onclick="setDeliver(\''+sid+'\',\''+k+'\')">'+label+'</button>'; }
+function byOrder(a,b){ return (a.order||0)-(b.order||0); }
+
+/* ----- マスタ ----- */
+function viewMaster(){
+  var sups = store.suppliers().sort(byOrder);
+  var cards = sups.map(function(sup){
+    var items = (sup.items||[]).map(function(item){
+      return '<div class="item"><div><span class="inm">'+esc(item.name)+'</span><span class="iunit">'+esc(item.unit||"")+'</span>'
+        + (item.split?' <span class="chip">内訳可</span>':'')+'</div>'
+        + '<button class="del" onclick="delItem(\''+sup.id+'\',\''+item.id+'\')">削除</button></div>';
+    }).join("");
+    return '<div class="card open"><div class="card-h"><div><span class="nm">'+esc(sup.name)+'</span> <span class="chip '+sup.channel+'">'+CHANNELS[sup.channel]+'</span></div>'
+      + '<button class="del" onclick="editSupplier(\''+sup.id+'\')">編集</button></div>'
+      + '<div class="card-b">'
+      + '<div class="muted" style="margin-bottom:6px">送り先: '+(sup.contact?esc(sup.contact):'<span style="color:var(--warn)">未登録</span>')+'</div>'
+      + items
+      + '<div class="additem"><input id="ain_'+sup.id+'" placeholder="品目名"><input id="au_'+sup.id+'" placeholder="単位" style="max-width:70px"><button onclick="addItem(\''+sup.id+'\')">追加</button></div>'
+      + '<label class="muted" style="display:block;margin-top:6px"><input type="checkbox" id="asp_'+sup.id+'"> 追加する品目は「内訳（他店舗分）」を使う</label>'
+      + '</div></div>';
+  }).join("");
+  return '<h2 class="sc">業者・品目マスタ</h2>'
+    + '<div class="hint">各業者の<b>送り先</b>（SMS=番号／メール=アドレス／LINE=（開いて選ぶ方式））と<b>定番品目</b>をここで登録します。「編集」で送り先を入力してください。</div>'
+    + cards
+    + '<div class="btns"><button class="btn s" onclick="addSupplier()">＋ 業者を追加</button></div>';
+}
+
+/* ----- 買い出し ----- */
+function viewShop(){
+  var all = store.shopping();
+  var list = all.filter(function(x){ return x.store===CUR || x.store==="common"; });
+  var rows = list.length ? list.map(function(x){
+    return '<div class="check'+(x.done?' done':'')+'"><input type="checkbox" '+(x.done?'checked':'')+' onchange="toggleShop(\''+x.id+'\')">'
+      + '<div class="txt">'+esc(x.text)+' <span class="chip">'+(x.store==="common"?"共通":storeName())+'</span></div>'
+      + '<div class="who">'+esc(x.by||'')+'</div><button class="del" onclick="delShop(\''+x.id+'\')">×</button></div>';
+  }).join("") : '<div class="muted">まだ何もありません。</div>';
+  return '<h2 class="sc">買い出しリスト</h2>'
+    + '<div class="hint">スーパー等で買うものの共有メモ。追加した店舗＋「共通」が表示されます。</div>'
+    + '<div class="additem"><input id="shopin" placeholder="買うものを追加"><button onclick="addShop(false)">追加</button></div>'
+    + '<div class="additem" style="margin-top:6px"><button class="btn g" style="flex:1" onclick="addShop(true)">＋ 共通として追加</button></div>'
+    + '<div style="margin-top:12px">'+rows+'</div>'
+    + '<div class="btns"><button class="btn g" onclick="clearDoneShop()">完了済みを削除</button></div>';
+}
+
+/* ---------- history ---------- */
+function dayKey(offset){ var d=todayPlus(offset||0); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
+function fmtTime(ts){ var d=new Date(ts); return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2); }
+function histHtml(n){
+  var os = store.orders().slice().sort(function(a,b){return b.ts-a.ts;}).slice(0,n);
+  if(!os.length) return '<div class="muted">まだありません。</div>';
+  return os.map(function(o){
+    var d=new Date(o.ts);
+    return '<div class="hist"><div class="meta">'+(d.getMonth()+1)+'/'+d.getDate()+' '+fmtTime(o.ts)+' ・ '+esc(o.supplierName)+' → '+esc(STORES[o.store]?STORES[o.store].name:o.store)+' ・ '+esc(o.by||'')
+      +' <a href="#" onclick="reuse(\''+o.id+'\');return false;">同じ内容で作る</a></div><pre>'+esc(o.text)+'</pre></div>';
+  }).join("");
+}
+
+/* ============================================================
+ * actions
+ * ============================================================ */
+function toggleCard(sid){ var sups=store.suppliers(); sups.forEach(function(s){ if(s.id===sid) s._open=!s._open; }); render(); }
+function setDeliver(sid,k){ draft[sid]=draft[sid]||{qty:{},split:{}}; draft[sid].deliver=k; draft[sid].text=null; refreshCardText(sid); }
+function qty(sid,iid,delta){
+  draft[sid]=draft[sid]||{deliver:"tomorrow",qty:{},split:{}};
+  var v=(draft[sid].qty[iid]||0)+delta; if(v<0)v=0; draft[sid].qty[iid]=v;
+  var qv=el("q_"+sid+"_"+iid); if(qv) qv.textContent=v;
+  draft[sid].text=null; refreshCardText(sid);
+}
+function toggleSplit(sid,iid){
+  draft[sid]=draft[sid]||{deliver:"tomorrow",qty:{},split:{}};
+  var sr=el("sr_"+sid+"_"+iid);
+  if(draft[sid].split[iid]==null){ draft[sid].split[iid]=0; if(sr) sr.classList.add("on"); }
+  else { delete draft[sid].split[iid]; if(sr) sr.classList.remove("on"); }
+  draft[sid].text=null; refreshCardText(sid);
+}
+function setSplit(sid,iid,v){ draft[sid].split[iid]=Math.max(0,parseInt(v,10)||0); draft[sid].text=null; refreshCardText(sid); }
+function editText(sid,v){ draft[sid]=draft[sid]||{qty:{},split:{}}; draft[sid].text=v; }
+function refreshCardText(sid){
+  var sup=findSup(sid); if(!sup) return;
+  var ta=el("msg_"+sid); if(ta && (draft[sid].text==null)) ta.value=buildText(sup);
+}
+function findSup(sid){ var a=store.suppliers(); for(var i=0;i<a.length;i++) if(a[i].id===sid) return a[i]; return null; }
+function currentText(sid){ var d=draft[sid]||{}; var sup=findSup(sid); return d.text!=null?d.text:buildText(sup); }
+
+function markOpened(sid){ /* 送信画面を開いた記録。実送信は人が行う */ setTimeout(function(){ saveOrder(sid,"opened"); },300); }
+function markSent(sid){ saveOrder(sid,"sent"); toast("送信を記録しました"); render(); }
+function saveOrder(sid,status){
+  var sup=findSup(sid); if(!sup) return;
+  var text=currentText(sid);
+  var os=store.orders();
+  os.push({ id:uid(), ts:Date.now(), dateKey:dayKey(0), store:CUR, supplierId:sid, supplierName:sup.name, channel:sup.channel, text:text, by:MYNAME, status:status });
+  store.saveOrders(os);
+}
+function copyText(sid){
+  var t=currentText(sid);
+  if(navigator.clipboard) navigator.clipboard.writeText(t).then(function(){toast("本文をコピーしました");},function(){fallbackCopy(t);});
+  else fallbackCopy(t);
+  saveOrder(sid,"opened");
+}
+function fallbackCopy(t){ var ta=document.createElement("textarea"); ta.value=t; document.body.appendChild(ta); ta.select(); try{document.execCommand("copy");toast("本文をコピーしました");}catch(e){} document.body.removeChild(ta); }
+function reuse(oid){ var o=store.orders().filter(function(x){return x.id===oid;})[0]; if(!o) return; draft[o.supplierId]={deliver:"tomorrow",qty:{},split:{},text:o.text}; var sup=findSup(o.supplierId); if(sup) sup._open=true; go("order"); }
+
+/* ----- master actions ----- */
+function addItem(sid){
+  var nm=el("ain_"+sid).value.trim(); if(!nm) return;
+  var unit=el("au_"+sid).value.trim();
+  var sp=el("asp_"+sid).checked;
+  var sups=store.suppliers(); var s=sups.filter(function(x){return x.id===sid;})[0];
+  s.items=s.items||[]; s.items.push(it(nm,unit,sp)); store.saveSuppliers(sups); render();
+}
+function delItem(sid,iid){ var sups=store.suppliers(); var s=sups.filter(function(x){return x.id===sid;})[0]; s.items=(s.items||[]).filter(function(i){return i.id!==iid;}); store.saveSuppliers(sups); render(); }
+function editSupplier(sid){
+  var s=findSup(sid);
+  var contactLabel = s.channel==="sms"?"携帯番号（SMS送信先）":s.channel==="email"?"メールアドレス":s.channel==="line"?"LINE（メモ・任意）":"Messenger（メモ・任意）";
+  openModal('<h3>'+esc(s.name)+' の設定</h3>'
+    + '<div class="field"><label>業者名</label><input id="m_name" value="'+esc(s.name)+'"></div>'
+    + '<div class="field"><label>連絡ツール</label><select id="m_ch">'+Object.keys(CHANNELS).map(function(c){return '<option value="'+c+'" '+(c===s.channel?'selected':'')+'>'+CHANNELS[c]+'</option>';}).join("")+'</select></div>'
+    + '<div class="field"><label>'+contactLabel+'</label><input id="m_contact" value="'+esc(s.contact||"")+'"></div>'
+    + '<div class="btns"><button class="btn p" onclick="saveSupplier(\''+sid+'\')">保存</button><button class="btn s" onclick="closeModal()">閉じる</button></div>'
+    + '<div style="text-align:center;margin-top:10px"><button class="del" onclick="delSupplier(\''+sid+'\')">この業者を削除</button></div>');
+}
+function saveSupplier(sid){
+  var sups=store.suppliers(); var s=sups.filter(function(x){return x.id===sid;})[0];
+  s.name=el("m_name").value.trim()||s.name; s.channel=el("m_ch").value; s.contact=el("m_contact").value.trim();
+  store.saveSuppliers(sups); closeModal(); render();
+}
+function delSupplier(sid){ if(!confirm("削除しますか？")) return; var sups=store.suppliers().filter(function(x){return x.id!==sid;}); store.saveSuppliers(sups); closeModal(); render(); }
+function addSupplier(){
+  var sups=store.suppliers();
+  sups.push({ id:uid(), name:"新しい業者", channel:"sms", contact:"", order:(sups.length+1), items:[] });
+  store.saveSuppliers(sups); render();
+}
+
+/* ----- shopping ----- */
+function addShop(common){
+  var v=el("shopin").value.trim(); if(!v && !common) return;
+  if(common && !v){ toast("先に品名を入力"); return; }
+  var a=store.shopping(); a.push({ id:uid(), text:v, store:common?"common":CUR, done:false, by:MYNAME, ts:Date.now() });
+  store.saveShopping(a); el("shopin").value=""; render();
+}
+function toggleShop(id){ var a=store.shopping(); a.forEach(function(x){ if(x.id===id){ x.done=!x.done; x.doneBy=x.done?MYNAME:""; } }); store.saveShopping(a); render(); }
+function delShop(id){ var a=store.shopping().filter(function(x){return x.id!==id;}); store.saveShopping(a); render(); }
+function clearDoneShop(){ var a=store.shopping().filter(function(x){return !x.done;}); store.saveShopping(a); render(); }
+
+/* ----- name / modal ----- */
+function askName(){
+  openModal('<h3>お名前（担当者）</h3><div class="field"><input id="nm_in" placeholder="例：田中" value="'+esc(MYNAME)+'"></div>'
+    + '<div class="btns"><button class="btn p" onclick="saveName()">保存</button><button class="btn s" onclick="closeModal()">閉じる</button></div>');
+}
+function saveName(){ MYNAME=el("nm_in").value.trim(); store.set(LS.name,MYNAME); closeModal(); render(); }
+function openModal(html){ el("modalbox").innerHTML=html; el("modal").classList.add("on"); }
+function closeModal(){ el("modal").classList.remove("on"); }
+el("modal").addEventListener("click",function(e){ if(e.target===this) closeModal(); });
+
+/* ---------- init ---------- */
+store.suppliers(); // seed if needed
+if(!MYNAME) setTimeout(askName, 400);
+render();
+if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(function(){}); }
+</script>
+</body>
+</html>
