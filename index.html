@@ -169,6 +169,8 @@
   .link{color:var(--primary); font-weight:700; cursor:pointer;}
   .empty{color:var(--sub); text-align:center; padding:26px 10px; font-size:14px;}
   .del{color:var(--error); font-size:13px; font-weight:700; background:none; border:0; cursor:pointer;}
+  .reord{border:1px solid var(--border); background:#fff; border-radius:8px; width:30px; height:30px; font-size:12px; cursor:pointer; color:var(--sub);}
+  .reord:active{transform:scale(.9);}
   .addrow{display:flex; gap:8px; margin-top:10px;}
   .addrow .input{flex:1;}
   .addrow button{border:0; background:var(--primary); color:#fff; font-weight:800; border-radius:var(--r-md); padding:0 18px; cursor:pointer;}
@@ -561,7 +563,8 @@ function masterDetail(sid){
     +((s.items||[]).length?(s.items||[]).map(function(item){
       return '<div class="irow"><div class="iname">'+esc(item.name)+'<span class="iunit">'+esc(item.unit||"")+'</span> '
         +'<span onclick="cycleItemStore(\''+sid+'\',\''+item.id+'\')" style="cursor:pointer">'+storeTag(item)+'</span></div>'
-        +'<button class="del" onclick="delItem(\''+sid+'\',\''+item.id+'\')">削除</button></div>';
+        +'<div style="display:flex;align-items:center;gap:5px"><button class="reord" onclick="moveItem(\''+sid+'\',\''+item.id+'\',-1)">▲</button><button class="reord" onclick="moveItem(\''+sid+'\',\''+item.id+'\',1)">▼</button>'
+        +'<button class="del" onclick="delItem(\''+sid+'\',\''+item.id+'\')">削除</button></div></div>';
     }).join(""):'<div class="empty">まだありません</div>')
     +'</div>'
     +'<div class="addrow"><input class="input" id="ain_'+sid+'" placeholder="品目名"><input class="input" id="au_'+sid+'" placeholder="単位" style="max-width:74px"></div>'
@@ -647,6 +650,8 @@ function cycleItemStore(sid,iid){var a=store.suppliers();var s=a.filter(function
   item.stores = cur==="abura,kaki" ? ["kaki"] : (cur==="kaki" ? ["abura"] : ["kaki","abura"]);
   store.saveSuppliers(a);render();}
 function delItem(sid,iid){var a=store.suppliers();var s=a.filter(function(x){return x.id===sid;})[0];s.items=(s.items||[]).filter(function(i){return i.id!==iid;});store.saveSuppliers(a);render();}
+function moveItem(sid,iid,dir){var a=store.suppliers();var s=a.filter(function(x){return x.id===sid;})[0];if(!s||!s.items)return;var arr=s.items;var idx=-1;for(var k=0;k<arr.length;k++)if(arr[k].id===iid)idx=k;var j=idx+dir;if(idx<0||j<0||j>=arr.length)return;var t=arr[idx];arr[idx]=arr[j];arr[j]=t;store.saveSuppliers(a);render();}
+function movePreset(pid,dir){var ps=store.shoppresets();var idx=-1;for(var k=0;k<ps.length;k++)if(ps[k].id===pid)idx=k;var j=idx+dir;if(idx<0||j<0||j>=ps.length)return;var t=ps[idx];ps[idx]=ps[j];ps[j]=t;store.saveShoppresets(ps);editPresets();}
 function toggleClosedWd(sid,wd){var a=store.suppliers();var s=a.filter(function(x){return x.id===sid;})[0];s.closedWeekdays=s.closedWeekdays||[];var i=s.closedWeekdays.indexOf(wd);if(i>=0)s.closedWeekdays.splice(i,1);else s.closedWeekdays.push(wd);store.saveSuppliers(a);render();}
 function addClosedDate(sid){var v=el("cd_"+sid).value;if(!v){toast("日付を選択");return;}var pp=v.split("-");var k=parseInt(pp[0],10)+"-"+parseInt(pp[1],10)+"-"+parseInt(pp[2],10);var a=store.suppliers();var s=a.filter(function(x){return x.id===sid;})[0];s.closedDates=s.closedDates||[];if(s.closedDates.indexOf(k)<0)s.closedDates.push(k);store.saveSuppliers(a);render();}
 function delClosedDate(sid,k){var a=store.suppliers();var s=a.filter(function(x){return x.id===sid;})[0];s.closedDates=(s.closedDates||[]).filter(function(x){return x!==k;});store.saveSuppliers(a);render();}
@@ -668,7 +673,7 @@ function presetStep(pid,delta){var p=store.shoppresets().filter(function(x){retu
   else { it.qty=(it.qty||0)+delta; if(it.qty<=0) a=a.filter(function(x){return x.id!==it.id;}); }
   store.saveShopping(a);render();}
 function editPresets(){var ps=store.shoppresets();
-  var rows=ps.length?ps.map(function(p){return '<div class="irow"><div class="iname">'+esc(p.name)+(p.unit?'<span class="iunit">'+esc(p.unit)+'</span>':'')+'</div><button class="del" onclick="delPreset(\''+p.id+'\')">削除</button></div>';}).join(""):'<div class="empty">なし</div>';
+  var rows=ps.length?ps.map(function(p){return '<div class="irow"><div class="iname">'+esc(p.name)+(p.unit?'<span class="iunit">'+esc(p.unit)+'</span>':'')+'</div><div style="display:flex;gap:5px"><button class="reord" onclick="movePreset(\''+p.id+'\',-1)">▲</button><button class="reord" onclick="movePreset(\''+p.id+'\',1)">▼</button><button class="del" onclick="delPreset(\''+p.id+'\')">削除</button></div></div>';}).join(""):'<div class="empty">なし</div>';
   openModal('<h3>定番リストの編集</h3><div class="items" style="max-height:42vh;overflow:auto">'+rows+'</div>'
     +'<div class="addrow" style="margin-top:12px"><input class="input" id="pin" placeholder="品名"><input class="input" id="pun" placeholder="単位" style="max-width:74px"><button onclick="addPreset()">追加</button></div>'
     +'<button class="btn ghost" style="margin-top:12px" onclick="closeModal();render()">閉じる</button>');}
