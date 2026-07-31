@@ -272,9 +272,9 @@ function seed(){
       items:[it("豚骨のタレ","本"),it("柿川亭のタレ","ケース",["kaki"]),it("メンマ","ケース"),it("にんにく","個")]},
     {id:uid(),name:"中越鶏卵",channel:"email",contact:"",category:"卵・鶏肉",av:{t:"🥚",bg:"#efe3bf"},order:3,template:"email",stores:["kaki"],
       items:[it("卵","kg")]},
-    {id:uid(),name:"竹内農園",channel:"line",contact:"",category:"野菜・青果",av:{t:"🌿",bg:"#d7ebcf"},order:4,items:[]},
-    {id:uid(),name:"マルヤマ包装",channel:"line",contact:"",category:"容器・包装資材",av:{t:"📦",bg:"#e4d6bd"},order:5,items:[]},
-    {id:uid(),name:"アルベーロ",channel:"messenger",contact:"",category:"備品・雑貨",av:{t:"💬",bg:"linear-gradient(135deg,#8a5cf6,#e0559b)"},order:6,items:[]}
+    {id:uid(),name:"竹内農園",channel:"line",contact:"",category:"野菜・青果",av:{t:"🌿",bg:"#d7ebcf"},order:4,items:[it("マスタード","パック"),it("辛口","パック"),it("マージ","パック")]},
+    {id:uid(),name:"マルヤマ包装",channel:"line",contact:"",category:"容器・包装資材",av:{t:"📦",bg:"#e4d6bd"},order:5,items:[it("米油","缶"),it("割り箸","箱"),it("爪楊枝","個"),it("おしぼり(赤)","箱"),it("おしぼり(青)","箱"),it("おしぼり(緑)","箱"),it("のり用小袋","パック"),it("食洗機用洗剤","本"),it("テイクアウト用容器","セット")]},
+    {id:uid(),name:"アルベーロ",channel:"messenger",contact:"",category:"備品・雑貨",av:{t:"💬",bg:"linear-gradient(135deg,#8a5cf6,#e0559b)"},order:6,items:[it("バジル","パック")]}
   ];
   store.saveSuppliers(s); return s;
 }
@@ -701,6 +701,16 @@ function migrate(){
     done.nakagoe_kaki=true; store.set(MK,done);
   }
   if(!done.presets_v2){ store.set(LS.shoppresets,null); seedPresets(); done.presets_v2=true; store.set(MK,done); }
+  if(!done.line_items_v1){
+    var a3=store.suppliers(); var ch3=false;
+    a3.forEach(function(s){
+      if(s.name==="竹内農園"&&(!s.items||!s.items.length)){ s.items=[it("マスタード","パック"),it("辛口","パック"),it("マージ","パック")]; ch3=true; }
+      if(s.name==="アルベーロ"&&(!s.items||!s.items.length)){ s.items=[it("バジル","パック")]; ch3=true; }
+      if(s.name==="マルヤマ包装"&&(!s.items||!s.items.length)){ s.items=[it("米油","缶"),it("割り箸","箱"),it("爪楊枝","個"),it("おしぼり(赤)","箱"),it("おしぼり(青)","箱"),it("おしぼり(緑)","箱"),it("のり用小袋","パック"),it("食洗機用洗剤","本"),it("テイクアウト用容器","セット")]; ch3=true; }
+    });
+    if(ch3) store.saveSuppliers(a3);
+    done.line_items_v1=true; store.set(MK,done);
+  }
 }
 
 /* init */
