@@ -402,8 +402,10 @@ function orderDetail(sid){
   var d=draft[sid]||(draft[sid]={deliver:"tomorrow",qty:{},split:{}});
   var st=statusOf(sup);
   var head='<div class="card"><div class="suprow">'+C_avatar(sup)+'<div class="supmid"><div class="supname">'+esc(sup.name)+' '+C_pill(CHANNELS[sup.channel],"ch-"+sup.channel)+'</div><div class="supcat">'+esc(sup.category||"")+'</div></div>'+C_status(st)+'</div></div>';
-  var seg='<label class="lbl-mini">お届け希望日</label><div class="seg">'
-    +segBtn(sid,"today","本日")+segBtn(sid,"tomorrow","明日")+segBtn(sid,"day2","明後日")+'</div>';
+  d.deliver="tomorrow";
+  var _di=deliverInfo("tomorrow");
+  var seg='<div class="card cardpad" style="padding:14px 16px;display:flex;align-items:center;justify-content:space-between"><span class="lbl-mini" style="margin:0">お届け日</span>'
+    +'<span style="font-size:16px;font-weight:700">明日 '+(_di.d.getMonth()+1)+'/'+_di.d.getDate()+'（'+WD[_di.d.getDay()]+'）</span></div>';
   var shownItems=(sup.items||[]).filter(function(item){return itemForStore(item,CUR);});
   var items = shownItems.length ? '<div class="card cardpad"><label class="lbl-mini">数量（'+esc(storeName())+'）</label><div class="items">'+shownItems.map(function(item){
       var q=d.qty[item.id]||0;
