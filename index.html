@@ -247,10 +247,9 @@ function closingKey(st,dk){ return st+"_"+dk; }
 function getClosing(st,dk){ return store.closing()[closingKey(st,dk)]||null; }
 function num(v){ v=parseFloat(v); return isNaN(v)?0:v; }
 function yen(n){ return "¥"+Math.round(n).toLocaleString("ja-JP"); }
+function cOtherTotal(c){ var s=0; (c.other||[]).forEach(function(o){ s+=num(o.amount); }); return s; }
 function cCalc(c){ if(!c) return {salesTotal:0,customers:0};
-  var st=num(c.kenbaiSales)+num(c.anydeliSales)+num(c.couponSales)+num(c.tsuhan);
-  var cust=(c.customers!=null&&c.customers!=="")?num(c.customers):(num(c.kenbaiCount)+Math.round(num(c.anydeliSales)/ANYDELI_UNIT)+num(c.couponCount));
-  return {salesTotal:st,customers:cust}; }
+  return { salesTotal:num(c.kenbaiSales)+num(c.anydeliSales)+cOtherTotal(c), customers:num(c.customers) }; }
 var cdraft={};
 function it(name,unit,stores){ return {id:uid(),name:name,unit:unit||"",stores:stores||["kaki","abura"]}; }
 function itemStores(item){ return (item.stores&&item.stores.length)?item.stores:["kaki","abura"]; }
@@ -261,7 +260,7 @@ function isClosedOn(sup,d){ if(!sup||!d) return false; if((sup.closedWeekdays||[
 function seed(){
   var s=[
     {id:uid(),name:"めんつう",channel:"sms",contact:"",category:"ラーメン麺",av:{t:"め",bg:"#243a6b"},order:1,
-      items:[it("太麺","玉"),it("細麺","玉"),it("冷凍12番150g","パック"),it("冷凍16番太麺","玉")]},
+      items:[it("太麺","箱"),it("細麺","箱"),it("グルテンフリー","箱")]},
     {id:uid(),name:"ホクショク",channel:"sms",contact:"",category:"食材・調味料",av:{t:"ホ",bg:"#7a2230"},order:2,
       items:[it("豚骨のタレ","本"),it("柿川亭のタレ","ケース",["kaki"]),it("メンマ","ケース"),it("にんにく","個")]},
     {id:uid(),name:"中越鶏卵",channel:"email",contact:"",category:"卵・鶏肉",av:{t:"🥚",bg:"#efe3bf"},order:3,
@@ -470,25 +469,32 @@ function segBtn(sid,k,label){var d=draft[sid];var on=(d&&d.deliver||"tomorrow")=
 /* ---------- 会計入力（Phase2a） ---------- */
 function closingDetail(){
   var dk=dayKey(0); var key=closingKey(CUR,dk); var d=todayPlus(0);
-  if(!cdraft[key]) cdraft[key]=Object.assign({kenbaiSales:"",kenbaiCount:"",anydeliSales:"",anydeliCount:"",couponCount:"",couponSales:"",tsuhan:"",customers:""}, getClosing(CUR,dk)||{});
-  var c=cdraft[key]; var calc=cCalc(c);
-  function f(field,label,unit){ return '<div class="field"><label>'+label+'</label><div style="display:flex;align-items:center;gap:8px"><input class="input" type="number" inputmode="decimal" id="c_'+field+'" value="'+esc(c[field]==null?"":c[field])+'" oninput="cset(\''+field+'\',this.value)">'+(unit?'<span class="iunit" style="min-width:34px">'+unit+'</span>':'')+'</div></div>'; }
+  if(!cdraft[key]) cdraft[key]=Object.assign({kenbaiSales:"",anydeliSales:"",other:[],customers:""}, getClosing(CUR,dk)||{});
+  var c=cdraft[key]; if(!c.other) c.other=[]; var calc=cCalc(c);
+  function f(field,label){ return '<div class="field"><label>'+label+'</label><div style="display:flex;align-items:center;gap:8px"><input class="input" type="number" inputmode="decimal" id="c_'+field+'" value="'+esc(c[field]==null?"":c[field])+'" oninput="cset(\''+field+'\',this.value)"><span class="iunit" style="min-width:24px">円</span></div></div>'; }
+  var others=(c.other||[]).map(function(o,i){ return '<div class="addrow" style="margin-top:8px"><input class="input" id="co_l_'+i+'" value="'+esc(o.label||"")+'" placeholder="内容（例：大盛り変更）" oninput="cOtherSet('+i+',\'label\',this.value)"><input class="input" type="number" inputmode="decimal" value="'+esc(o.amount==null?"":o.amount)+'" placeholder="金額" style="max-width:96px" oninput="cOtherSet('+i+',\'amount\',this.value)"><button class="del" style="padding:0 8px;font-size:20px" onclick="cOtherDel('+i+')">×</button></div>'; }).join("");
   return '<div class="card"><div class="suprow"><div class="avatar" style="background:var(--primary)">'+ic("clipboard")+'</div><div class="supmid"><div class="supname">会計入力</div><div class="supcat">'+esc(storeName())+' ・ '+(d.getMonth()+1)+'/'+d.getDate()+'（'+WD[d.getDay()]+'）</div></div></div></div>'
-    +'<div class="card cardpad"><label class="lbl-mini">券売機</label>'+f("kenbaiSales","券売機売上","円")+f("kenbaiCount","券売機杯数","杯")+'</div>'
-    +'<div class="card cardpad"><label class="lbl-mini">anydeli（エニデリ）</label>'+f("anydeliSales","anydeli売上","円")+f("anydeliCount","anydeli件数","件")+'</div>'
-    +'<div class="card cardpad"><label class="lbl-mini">クーポン・通販ほか</label>'+f("couponCount","クーポン枚数","枚")+f("couponSales","クーポン売上","円")+f("tsuhan","通販・その他","円")+'</div>'
+    +'<div class="card cardpad">'+f("kenbaiSales","券売機売上")+f("anydeliSales","anydeli（エニデリ）売上")+'</div>'
+    +'<div class="card cardpad"><label class="lbl-mini">その他売上（現金など・明細）</label>'
+      +'<div class="cwho" style="margin-bottom:2px">券売機以外でもらった売上（例：大盛り変更 +50円／瓶ビール）。何件でも追加OK</div>'
+      +others
+      +'<button class="btn ghost" style="margin-top:10px" onclick="cOtherAdd()"><span>'+ic("plus")+'</span>明細を追加</button>'
+    +'</div>'
     +'<div class="card cardpad"><label class="lbl-mini">自動計算</label>'
-      +'<div class="irow"><div class="iname">売上合計</div><div style="font-weight:800;font-size:18px" id="c_total">'+yen(calc.salesTotal)+'</div></div>'
-      +'<div class="irow"><div class="iname">推定客数 <span class="iunit">（暫定式）</span></div><div><span style="font-weight:800;font-size:18px" id="c_cust">'+calc.customers+'</span> 人</div></div>'
-      +'<div class="cwho" style="margin-top:8px">客数＝券売機杯数＋anydeli換算(÷'+ANYDELI_UNIT+')＋クーポン枚数（暫定式・あとで実際に合わせます）</div>'
-      +'<div class="field" style="margin-top:10px"><label>客数を手入力で上書き（任意）</label><input class="input" type="number" inputmode="numeric" id="c_customers" value="'+esc(c.customers==null?"":c.customers)+'" placeholder="空欄なら自動計算" oninput="cset(\'customers\',this.value)"></div>'
+      +'<div class="irow"><div class="iname">売上合計</div><div style="font-weight:800;font-size:20px" id="c_total">'+yen(calc.salesTotal)+'</div></div>'
+      +'<div class="field" style="margin-top:12px"><label>来店客数（任意）</label><input class="input" type="number" inputmode="numeric" id="c_customers" value="'+esc(c.customers==null?"":c.customers)+'" placeholder="分かれば入力（空欄OK）" oninput="cset(\'customers\',this.value)"></div>'
     +'</div>'
     +'<button class="btn primary" onclick="saveClosingRecord()"><span>'+ic("check")+'</span>保存する</button>';
 }
-function cset(field,val){ var key=closingKey(CUR,dayKey(0)); cdraft[key]=cdraft[key]||{}; cdraft[key][field]=val;
-  var calc=cCalc(cdraft[key]); var t=el("c_total"); if(t)t.textContent=yen(calc.salesTotal); var cu=el("c_cust"); if(cu)cu.textContent=calc.customers; }
+function cKeyNow(){ return closingKey(CUR,dayKey(0)); }
+function cRefreshTotal(){ var t=el("c_total"); if(t)t.textContent=yen(cCalc(cdraft[cKeyNow()]||{}).salesTotal); }
+function cset(field,val){ var key=cKeyNow(); cdraft[key]=cdraft[key]||{other:[]}; cdraft[key][field]=val; cRefreshTotal(); }
+function cOtherSet(i,field,val){ var c=cdraft[cKeyNow()]; if(!c||!c.other||!c.other[i])return; c.other[i][field]=val; cRefreshTotal(); }
+function cOtherAdd(){ var key=cKeyNow(); cdraft[key]=cdraft[key]||{other:[]}; cdraft[key].other=cdraft[key].other||[]; cdraft[key].other.push({label:"",amount:""}); render(); }
+function cOtherDel(i){ var c=cdraft[cKeyNow()]; if(c&&c.other){ c.other.splice(i,1); render(); } }
 function saveClosingRecord(){ var dk=dayKey(0); var key=closingKey(CUR,dk); var c=cdraft[key]||{}; var calc=cCalc(c);
-  var all=store.closing(); all[key]=Object.assign({},c,{store:CUR,date:dk,salesTotal:calc.salesTotal,customersCalc:calc.customers,inputBy:MYNAME,updatedAt:Date.now()}); store.saveClosing(all);
+  var other=(c.other||[]).filter(function(o){return (o.label&&(""+o.label).trim())||num(o.amount);});
+  var all=store.closing(); all[key]=Object.assign({},c,{store:CUR,date:dk,other:other,salesTotal:calc.salesTotal,customersCalc:calc.customers,inputBy:MYNAME,updatedAt:Date.now()}); store.saveClosing(all);
   toast("保存しました"); closeDetail(); }
 
 /* ---------- マスタ ---------- */
@@ -645,8 +651,20 @@ function openModal(h){el("modalbox").innerHTML=h;el("modal").classList.add("on")
 function closeModal(){el("modal").classList.remove("on");}
 el("modal").addEventListener("click",function(e){if(e.target===this)closeModal();});
 
+/* 既存データへの移行（冪等・フラグ管理） */
+function migrate(){
+  var MK="shime_migrations"; var done=store.get(MK,{});
+  if(!done.mentsu_box){
+    var a=store.suppliers(); var changed=false;
+    a.forEach(function(s){ if(s.name==="めんつう"){ s.items=[it("太麺","箱"),it("細麺","箱"),it("グルテンフリー","箱")]; changed=true; } });
+    if(changed) store.saveSuppliers(a);
+    done.mentsu_box=true; store.set(MK,done);
+  }
+}
+
 /* init */
 store.suppliers();
+migrate();
 if(!MYNAME)setTimeout(askName,500);
 render();
 if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(function(){});
