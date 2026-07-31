@@ -209,7 +209,7 @@
  * ============================================================ */
 var STORES = { kaki:{id:"kaki",name:"柿川亭",icon:"store"}, abura:{id:"abura",name:"アブララボ",icon:"flask"} };
 var CHANNELS = { sms:"SMS", email:"メール", line:"LINE", messenger:"Messenger" };
-var LS = { suppliers:"shime_suppliers_v2", shopping:"shime_shopping", orders:"shime_orders", name:"shime_name", store:"shime_store", closing:"shime_closing" };
+var LS = { suppliers:"shime_suppliers_v2", shopping:"shime_shopping", orders:"shime_orders", name:"shime_name", store:"shime_store", closing:"shime_closing", shoppresets:"shime_shoppresets" };
 var ANYDELI_UNIT = 1000; // anydeli客数換算単価
 var uid = function(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); };
 
@@ -241,8 +241,15 @@ var store = {
   shopping:function(){ return store.get(LS.shopping,[]); },
   saveShopping:function(a){ store.set(LS.shopping,a); },
   closing:function(){ return store.get(LS.closing,{}); },
-  saveClosing:function(o){ store.set(LS.closing,o); }
+  saveClosing:function(o){ store.set(LS.closing,o); },
+  shoppresets:function(){ return store.get(LS.shoppresets,null)||seedPresets(); },
+  saveShoppresets:function(a){ store.set(LS.shoppresets,a); }
 };
+function seedPresets(){
+  var names=[["青ネギ","袋"],["白ネギ","袋"],["レモン","個"],["りんご","個"],["ぶどう","パック"],["チーズ",""],["梅",""],["ゆずこしょう",""],["青じそ","袋"],["わさび",""],["キムチ",""],["炭酸水","本"]];
+  var a=names.map(function(n){return {id:uid(),name:n[0],unit:n[1]};});
+  store.saveShoppresets(a); return a;
+}
 function closingKey(st,dk){ return st+"_"+dk; }
 function getClosing(st,dk){ return store.closing()[closingKey(st,dk)]||null; }
 function num(v){ v=parseFloat(v); return isNaN(v)?0:v; }
@@ -567,23 +574,29 @@ function masterDetail(sid){
 }
 
 /* ---------- 買い出し ---------- */
+function presetItem(pid){ var l=store.shopping(); for(var i=0;i<l.length;i++){ if(l[i].presetId===pid && (l[i].store===CUR||l[i].store==="common")) return l[i]; } return null; }
 function viewShop(){
-  var list=store.shopping().filter(function(x){return x.store===CUR||x.store==="common";});
-  var rows=list.length?'<div class="card">'+list.map(function(x){
-    var q=x.qty||1, unit=x.unit||"";
+  var presets=store.shoppresets();
+  var defRows=presets.map(function(p){
+    var it=presetItem(p.id); var q=it?(it.qty||0):0;
+    return '<div class="irow"><div class="iname">'+esc(p.name)+(p.unit?'<span class="iunit">'+esc(p.unit)+'</span>':'')+'</div>'
+      +'<div class="stepper"><button onclick="presetStep(\''+p.id+'\',-1)">−</button><span class="qv'+(q>0?" hot":"")+'">'+q+'</span><button onclick="presetStep(\''+p.id+'\',1)">＋</button></div></div>';
+  }).join("");
+  var list=store.shopping().filter(function(x){return (x.store===CUR||x.store==="common")&&(x.qty||0)>0;});
+  var buyRows=list.length?list.map(function(x){
     return '<div class="check'+(x.done?' done':'')+'"><div class="cbox'+(x.done?' on':'')+'" onclick="toggleShop(\''+x.id+'\')">'+ic("check")+'</div>'
-      +'<div class="ctxt" style="min-width:0"><div>'+esc(x.text)+' '+C_pill(x.store==="common"?"共通":storeName(),"ch-sms")+'</div>'
-      +'<div class="cwho">'+esc(x.by||"")+'</div></div>'
-      +'<div class="stepper"><button onclick="shopQty(\''+x.id+'\',-1)">−</button><span class="qv'+(q>0?" hot":"")+'">'+q+'</span><button onclick="shopQty(\''+x.id+'\',1)">＋</button></div>'
-      +(unit?'<span class="iunit" style="min-width:40px">'+esc(unit)+'</span>':'<span style="width:40px"></span>')
+      +'<div class="ctxt" style="min-width:0">'+esc(x.text)+' <b>'+(x.qty||1)+'</b>'+(x.unit?esc(x.unit):"")+' '+C_pill(x.store==="common"?"共通":storeName(),"ch-sms")+(x.presetId?"":' '+C_pill("突発","ch-messenger"))+'</div>'
       +'<button class="del" onclick="delShop(\''+x.id+'\')">×</button></div>';
-  }).join("")+'</div>':'<div class="card empty">まだ何もありません</div>';
+  }).join(""):'<div class="empty">まだありません（上で個数を選ぶか、突発を追加）</div>';
   return C_sec("cart","買い出しリスト")
-    +'<div class="lead">スーパー等で買うものの共有メモ。品名と単位を入れて、個数は−＋で調整できます。追加した店舗＋「共通」が表示されます。</div>'
-    +'<div class="addrow"><input class="input" id="shopin" placeholder="品名（例：青ネギ）"><input class="input" id="shopunit" placeholder="単位" style="max-width:90px"><button onclick="addShop(false)">'+ic("plus")+'</button></div>'
-    +'<button class="btn ghost" style="margin-top:8px" onclick="addShop(true)">＋ 共通として追加</button>'
-    +'<div class="mt">'+rows+'</div>'
-    +'<button class="btn ghost mt" onclick="clearDoneShop()">完了済みを削除</button>';
+    +'<div class="lead">朝スーパーで買うものリスト。定番は個数を選ぶだけ、突発のものは自由に追加できます。</div>'
+    +'<div class="card cardpad"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><label class="lbl-mini" style="margin:0">定番（個数を選ぶだけ）</label><span class="link" onclick="editPresets()">定番を編集</span></div><div class="items">'+defRows+'</div></div>'
+    +'<div class="card cardpad"><label class="lbl-mini">突発（その他・自由に追加）</label>'
+      +'<div class="addrow"><input class="input" id="shopin" placeholder="品名（例：割り箸）"><input class="input" id="shopunit" placeholder="単位" style="max-width:74px"></div>'
+      +'<div class="addrow" style="margin-top:8px"><select class="input" id="shopscope"><option value="'+CUR+'">'+esc(storeName())+'</option><option value="common">共通</option></select><button onclick="addShop()">'+ic("plus")+'追加</button></div></div>'
+    +'<div class="sec mt" style="margin-bottom:12px"><h2 style="font-size:var(--fs-sec)">買うものリスト</h2></div>'
+    +'<div class="card">'+buyRows+'</div>'
+    +'<button class="btn ghost mt" onclick="clearDoneShop()">買えたもの（チェック済）を消す</button>';
 }
 
 /* ---------- history ---------- */
@@ -638,8 +651,19 @@ function delSupplier(sid){if(!confirm("この業者を削除しますか？"))re
 function addSupplier(){var a=store.suppliers();a.push({id:uid(),name:"新しい業者",channel:"sms",contact:"",category:"",av:{t:"新",bg:"#8a8a80"},order:a.length+1,items:[]});store.saveSuppliers(a);var nw=a[a.length-1];openDetail("master",nw.id);}
 
 /* shopping */
-function addShop(common){var i=el("shopin");var v=i.value.trim();if(!v){toast("品名を入力");return;}var u=el("shopunit")?el("shopunit").value.trim():"";var a=store.shopping();a.push({id:uid(),text:v,unit:u,qty:1,store:common?"common":CUR,done:false,by:MYNAME,ts:Date.now()});store.saveShopping(a);i.value="";if(el("shopunit"))el("shopunit").value="";render();}
-function shopQty(id,d){var a=store.shopping();a.forEach(function(x){if(x.id===id){x.qty=Math.max(0,(x.qty||1)+d);}});store.saveShopping(a);render();}
+function addShop(){var i=el("shopin");var v=i.value.trim();if(!v){toast("品名を入力");return;}var u=el("shopunit")?el("shopunit").value.trim():"";var scope=el("shopscope")?el("shopscope").value:CUR;var a=store.shopping();a.push({id:uid(),text:v,unit:u,qty:1,store:scope,done:false,by:MYNAME,ts:Date.now()});store.saveShopping(a);render();}
+function presetStep(pid,delta){var p=store.shoppresets().filter(function(x){return x.id===pid;})[0];if(!p)return;
+  var a=store.shopping();var it=null;for(var i=0;i<a.length;i++){if(a[i].presetId===pid&&(a[i].store===CUR||a[i].store==="common")){it=a[i];break;}}
+  if(!it){ if(delta<=0)return; a.push({id:uid(),text:p.name,unit:p.unit||"",qty:delta,store:CUR,done:false,presetId:pid,by:MYNAME,ts:Date.now()}); }
+  else { it.qty=(it.qty||0)+delta; if(it.qty<=0) a=a.filter(function(x){return x.id!==it.id;}); }
+  store.saveShopping(a);render();}
+function editPresets(){var ps=store.shoppresets();
+  var rows=ps.length?ps.map(function(p){return '<div class="irow"><div class="iname">'+esc(p.name)+(p.unit?'<span class="iunit">'+esc(p.unit)+'</span>':'')+'</div><button class="del" onclick="delPreset(\''+p.id+'\')">削除</button></div>';}).join(""):'<div class="empty">なし</div>';
+  openModal('<h3>定番リストの編集</h3><div class="items" style="max-height:42vh;overflow:auto">'+rows+'</div>'
+    +'<div class="addrow" style="margin-top:12px"><input class="input" id="pin" placeholder="品名"><input class="input" id="pun" placeholder="単位" style="max-width:74px"><button onclick="addPreset()">追加</button></div>'
+    +'<button class="btn ghost" style="margin-top:12px" onclick="closeModal();render()">閉じる</button>');}
+function addPreset(){var n=el("pin").value.trim();if(!n)return;var u=el("pun").value.trim();var ps=store.shoppresets();ps.push({id:uid(),name:n,unit:u});store.saveShoppresets(ps);editPresets();}
+function delPreset(pid){store.saveShoppresets(store.shoppresets().filter(function(x){return x.id!==pid;}));editPresets();}
 function toggleShop(id){var a=store.shopping();a.forEach(function(x){if(x.id===id){x.done=!x.done;x.doneBy=x.done?MYNAME:"";}});store.saveShopping(a);render();}
 function delShop(id){store.saveShopping(store.shopping().filter(function(x){return x.id!==id;}));render();}
 function clearDoneShop(){store.saveShopping(store.shopping().filter(function(x){return !x.done;}));render();}
