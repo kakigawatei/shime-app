@@ -511,14 +511,17 @@ function orderDetail(sid){
   var warn = closed ? '<div class="warnbox"><div class="wt">⚠️ この業者は明日 '+(dd.getMonth()+1)+'/'+dd.getDate()+'（'+WD[dd.getDay()]+'）はお休みです</div><div class="ws">注文を受けられない日のため、発注の送信はできません。別の日に手配してください。</div></div>' : '';
   var text=d.text!=null?d.text:buildText(sup);
   var link=sendLink(sup,text);
+  var empty=!hasQty(sid);
   var sendBtn = closed
     ? '<div class="btn disabled"><span>'+ic("send")+'</span>お休みのため送信できません</div>'
-    : (link.href
-      ? '<button class="btn primary" onclick="sendNow(\''+sid+'\')"><span>'+ic("send")+'</span>'+link.label+'</button>'
-      : '<div class="btn disabled">'+link.label+'（マスタで'+link.need+'を登録）</div>');
+    : (empty
+      ? '<div class="btn disabled"><span>'+ic("send")+'</span>数量を入れると送信できます</div>'
+      : (link.href
+        ? '<button class="btn primary" onclick="sendNow(\''+sid+'\')"><span>'+ic("send")+'</span>'+link.label+'</button>'
+        : '<div class="btn disabled">'+link.label+'（マスタで'+link.need+'を登録）</div>'));
   var prev='<div class="card cardpad"><label class="lbl-mini">送信プレビュー（タップで直接編集OK）</label>'
     +'<textarea class="input" id="msg_'+sid+'" oninput="editText(\''+sid+'\',this.value)">'+esc(text)+'</textarea></div>';
-  var actions = closed ? ''
+  var actions = (closed||empty) ? ''
     : '<div class="btnrow"><button class="btn sec" onclick="copyText(\''+sid+'\')"><span>'+ic("copy")+'</span>本文コピー</button>'
       +'<button class="btn ok" onclick="markSent(\''+sid+'\')"><span>'+ic("check")+'</span>送信した</button></div>';
   return head+warn+seg+items+prev+sendBtn+actions;
@@ -667,9 +670,11 @@ function histCard(n){
  * actions
  * ============================================================ */
 function setDeliver(sid,k){draft[sid]=draft[sid]||{qty:{},split:{}};draft[sid].deliver=k;draft[sid].text=null;render();}
-function qty(sid,iid,delta){draft[sid]=draft[sid]||{deliver:"tomorrow",qty:{},split:{}};var v=(draft[sid].qty[iid]||0)+delta;if(v<0)v=0;draft[sid].qty[iid]=v;draft[sid].text=null;
+function qty(sid,iid,delta){draft[sid]=draft[sid]||{deliver:"tomorrow",qty:{},split:{}};var was=hasQty(sid);var v=(draft[sid].qty[iid]||0)+delta;if(v<0)v=0;draft[sid].qty[iid]=v;draft[sid].text=null;
+  if(hasQty(sid)!==was){render();return;} /* 未入力↔入力の境界で送信ボタン等を更新 */
   var qv=el("q_"+sid+"_"+iid);if(qv){qv.textContent=v;qv.classList.toggle("hot",v>0);}var ta=el("msg_"+sid);if(ta)ta.value=buildText(findSup(sid));}
-function toggleItem(sid,iid,lot){draft[sid]=draft[sid]||{deliver:"tomorrow",qty:{},split:{}};var on=(draft[sid].qty[iid]||0)>0;var v=on?0:(lot||1);draft[sid].qty[iid]=v;draft[sid].text=null;
+function toggleItem(sid,iid,lot){draft[sid]=draft[sid]||{deliver:"tomorrow",qty:{},split:{}};var was=hasQty(sid);var on=(draft[sid].qty[iid]||0)>0;var v=on?0:(lot||1);draft[sid].qty[iid]=v;draft[sid].text=null;
+  if(hasQty(sid)!==was){render();return;} /* チェック切替で送信可否を更新 */
   var b=el("q_"+sid+"_"+iid);if(b){b.classList.toggle("on",v>0);b.textContent=v>0?"✓ 注文する":"注文しない";}var ta=el("msg_"+sid);if(ta)ta.value=buildText(findSup(sid));}
 function toggleSplit(sid,iid){draft[sid]=draft[sid]||{deliver:"tomorrow",qty:{},split:{}};var sr=el("sr_"+sid+"_"+iid);
   if(draft[sid].split[iid]==null){draft[sid].split[iid]=0;if(sr)sr.classList.add("on");}else{delete draft[sid].split[iid];if(sr)sr.classList.remove("on");}
