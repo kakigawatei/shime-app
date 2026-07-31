@@ -297,7 +297,7 @@ function num(v){ v=parseFloat(v); return isNaN(v)?0:v; }
 function yen(n){ return "¥"+Math.round(n).toLocaleString("ja-JP"); }
 function cOtherTotal(c){ var s=0; (c.other||[]).forEach(function(o){ s+=num(o.amount); }); return s; }
 function cCalc(c){ if(!c) return {salesTotal:0,customers:0};
-  return { salesTotal:num(c.kenbaiSales)+num(c.anydeliSales)+cOtherTotal(c), customers:num(c.customers) }; }
+  return { salesTotal:num(c.kenbaiSales)+num(c.anydeliSales)+num(c.couponSales)+cOtherTotal(c), customers:num(c.customers) }; }
 var cdraft={};
 function it(name,unit,stores){ return {id:uid(),name:name,unit:unit||"",stores:stores||["kaki","abura"]}; }
 function eggItem(){ return {id:uid(),name:"卵",unit:"kg",check:true,lot:5,stores:["kaki"]}; }
@@ -529,11 +529,11 @@ function segBtn(sid,k,label){var d=draft[sid];var on=(d&&d.deliver||"tomorrow")=
 /* ---------- 会計入力フォーム（Phase2a・会計タブ内） ---------- */
 function closingForm(){
   var dk=dayKey(0); var key=closingKey(CUR,dk); var d=todayPlus(0);
-  if(!cdraft[key]) cdraft[key]=Object.assign({kenbaiSales:"",anydeliSales:"",other:[],customers:""}, getClosing(CUR,dk)||{});
+  if(!cdraft[key]) cdraft[key]=Object.assign({kenbaiSales:"",anydeliSales:"",couponSales:"",other:[],customers:""}, getClosing(CUR,dk)||{});
   var c=cdraft[key]; if(!c.other) c.other=[]; var calc=cCalc(c);
   function f(field,label){ return '<div class="field"><label>'+label+'</label><div style="display:flex;align-items:center;gap:8px"><input class="input" type="number" inputmode="decimal" id="c_'+field+'" value="'+esc(c[field]==null?"":c[field])+'" oninput="cset(\''+field+'\',this.value)"><span class="iunit" style="min-width:24px">円</span></div></div>'; }
   var others=(c.other||[]).map(function(o,i){ return '<div class="addrow" style="margin-top:8px"><input class="input" id="co_l_'+i+'" value="'+esc(o.label||"")+'" placeholder="内容（例：大盛り変更）" oninput="cOtherSet('+i+',\'label\',this.value)"><input class="input" type="number" inputmode="decimal" value="'+esc(o.amount==null?"":o.amount)+'" placeholder="金額" style="max-width:96px" oninput="cOtherSet('+i+',\'amount\',this.value)"><button class="del" style="padding:0 8px;font-size:20px" onclick="cOtherDel('+i+')">×</button></div>'; }).join("");
-  return '<div class="card cardpad">'+f("kenbaiSales","券売機売上")+f("anydeliSales","anydeli（エニデリ）売上")+'</div>'
+  return '<div class="card cardpad">'+f("kenbaiSales","券売機売上")+f("anydeliSales","売上（AnyDelivery）")+f("couponSales","クーポン（AnyDelivery）")+'</div>'
     +'<div class="card cardpad"><label class="lbl-mini">その他売上（現金など・明細）</label>'
       +'<div class="cwho" style="margin-bottom:2px">券売機以外でもらった売上（例：大盛り変更 +50円／瓶ビール）。何件でも追加OK</div>'
       +others
@@ -810,7 +810,14 @@ store.suppliers();
 if(!MYNAME)setTimeout(askName,500);
 render();
 startSync(); // クラウドから取得→その後にmigrate()を回す（pullが移行後データを古いクラウド値で上書きする競合を防ぐ）
-if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(function(){});
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js").then(function(reg){
+    reg.update();
+    document.addEventListener("visibilitychange",function(){ if(!document.hidden) reg.update(); });
+  }).catch(function(){});
+  var swRefreshed=false;
+  navigator.serviceWorker.addEventListener("controllerchange",function(){ if(swRefreshed)return; swRefreshed=true; location.reload(); });
+}
 </script>
 </body>
 </html>
