@@ -235,7 +235,7 @@ function ic(n){ return IC[n]||""; }
 /* ---------- data ---------- */
 var store = {
   get:function(k,d){ try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;} },
-  set:function(k,v){ try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} },
+  set:function(k,v){ try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} if(typeof cloudMark==="function")cloudMark(k); },
   suppliers:function(){ return store.get(LS.suppliers,null)||seed(); },
   saveSuppliers:function(a){ store.set(LS.suppliers,a); },
   orders:function(){ return store.get(LS.orders,[]); },
@@ -247,6 +247,40 @@ var store = {
   shoppresets:function(){ return store.get(LS.shoppresets,null)||seedPresets(); },
   saveShoppresets:function(a){ store.set(LS.shoppresets,a); }
 };
+
+/* ============================================================
+ * クラウド同期（Firebase kakigawatei-franchise・社員共有）
+ * 共有データ=業者マスタ/買い物リスト/発注/会計/定番。名前・店舗選択・移行フラグは端末ローカル。
+ * 方式: 各データを shime_docs/{id} の {json} フィールドに保存。匿名認証+REST。
+ *       保存時にクラウドへpush(debounce)、読込/ポーリングでpull(他端末の変更反映)。
+ * ============================================================ */
+var FB={apiKey:"AIzaSyDtDZIEQtBzjujnpTDcXt1QeEU2r-wbg74",projectId:"kakigawatei-franchise"};
+var CLOUD={ suppliers:LS.suppliers, shopping:LS.shopping, orders:LS.orders, closing:LS.closing, presets:LS.shoppresets };
+var CLOUD_ON=false, fbTok=null, fbExp=0, pushTimers={};
+function fbAnon(){ return fetch("https://identitytoolkit.googleapis.com/v1/accounts:signUp?key="+FB.apiKey,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({returnSecureToken:true})}).then(function(x){if(!x.ok)throw 0;return x.json();}).then(function(d){fbTok=d.idToken;fbExp=Date.now()+(parseInt(d.expiresIn,10)-60)*1000;try{localStorage.setItem("shime_fb_refresh",d.refreshToken);}catch(e){}return fbTok;}); }
+function fbAuth(){ if(fbTok&&Date.now()<fbExp)return Promise.resolve(fbTok); var r=null;try{r=localStorage.getItem("shime_fb_refresh");}catch(e){}
+  if(r) return fetch("https://securetoken.googleapis.com/v1/token?key="+FB.apiKey,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"grant_type=refresh_token&refresh_token="+encodeURIComponent(r)}).then(function(x){if(!x.ok)throw 0;return x.json();}).then(function(d){fbTok=d.id_token;fbExp=Date.now()+(parseInt(d.expires_in,10)-60)*1000;return fbTok;}).catch(fbAnon);
+  return fbAnon(); }
+function fsUrl(id){ return "https://firestore.googleapis.com/v1/projects/"+FB.projectId+"/databases/(default)/documents/shime_docs/"+id; }
+function cloudGet(id){ return fbAuth().then(function(t){return fetch(fsUrl(id),{headers:{Authorization:"Bearer "+t}});}).then(function(r){ if(r.status===404)return null; if(!r.ok)throw new Error("get "+r.status); return r.json(); }).then(function(d){ return (d&&d.fields&&d.fields.json)?d.fields.json.stringValue:null; }); }
+function cloudPut(id,jsonStr){ return fbAuth().then(function(t){return fetch(fsUrl(id)+"?updateMask.fieldPaths=json&updateMask.fieldPaths=ts",{method:"PATCH",headers:{Authorization:"Bearer "+t,"Content-Type":"application/json"},body:JSON.stringify({fields:{json:{stringValue:jsonStr},ts:{integerValue:String(Date.now())}}})});}).then(function(r){if(!r.ok)throw new Error("put "+r.status);}); }
+function cloudMark(lsKey){ if(!CLOUD_ON)return; var id=null; for(var k in CLOUD) if(CLOUD[k]===lsKey) id=k; if(!id)return;
+  setSync("同期中…"); clearTimeout(pushTimers[id]); pushTimers[id]=setTimeout(function(){ var v=localStorage.getItem(lsKey)||""; cloudPut(id,v).then(function(){setSync("同期済");}).catch(function(){setSync("後で同期");}); },700); }
+function cloudPullAll(){ var ids=Object.keys(CLOUD);
+  return Promise.all(ids.map(function(id){ return cloudGet(id).then(function(js){return {id:id,js:js};}).catch(function(){return {id:id,js:undefined};}); })).then(function(res){
+    var changed=false; res.forEach(function(r){ var lsKey=CLOUD[r.id];
+      if(r.js===undefined){}
+      else if(r.js===null){ var local=localStorage.getItem(lsKey); if(local){ cloudPut(r.id,local).catch(function(){}); } }
+      else { var cur=localStorage.getItem(lsKey); if(cur!==r.js){ try{localStorage.setItem(lsKey,r.js);}catch(e){} changed=true; } }
+    }); return changed; }); }
+function setSync(t){ var e=el("syncst"); if(e)e.textContent=t; }
+function startSync(){ CLOUD_ON=true; setSync("同期中…");
+  cloudPullAll().then(function(){ setSync("同期済"); render(); }).catch(function(){ setSync("オフライン"); }).then(function(){ pollSync(); }); }
+function pollSync(){
+  setInterval(function(){ if(el("modal").classList.contains("on")||STATE.detail)return;
+    cloudPullAll().then(function(ch){ setSync("同期済"); if(ch)render(); }).catch(function(){setSync("オフライン");}); },20000);
+  document.addEventListener("visibilitychange",function(){ if(!document.hidden&&!(el("modal").classList.contains("on")||STATE.detail)){ cloudPullAll().then(function(ch){setSync("同期済");if(ch)render();}).catch(function(){}); } });
+}
 function seedPresets(){
   var names=[["青ネギ","パック"],["白ネギ","パック"],["リンゴジュース","本"],["ブドウジュース","本"],["パインジュース","本"],["チーズ","袋"],["梅","本"],["柚子胡椒","本"],["青じそ","本"],["わさび","本"],["キムチ","パック"],["炭酸水","本"]];
   var a=names.map(function(n){return {id:uid(),name:n[0],unit:n[1]};});
@@ -368,7 +402,7 @@ function renderHeader(){
     h.innerHTML='<div class="htop"><button class="hback" onclick="closeDetail()">'+ic("back")+'戻る</button>'
       +'<div class="hname" onclick="askName()">担当: '+esc(MYNAME||"未設定")+'</div></div>';
   } else {
-    h.innerHTML='<div class="htop"><div class="htitle">締めアプリ</div><div class="hname" onclick="askName()">担当: '+esc(MYNAME||"未設定")+'</div></div>'
+    h.innerHTML='<div class="htop"><div class="htitle">締めアプリ <span id="syncst" style="font-size:10px;font-weight:600;opacity:.8">…</span></div><div class="hname" onclick="askName()">担当: '+esc(MYNAME||"未設定")+'</div></div>'
       +'<div class="stabs">'
       +'<div class="stab '+(CUR==="kaki"?"on":"")+'" onclick="setStore(\'kaki\')">'+ic("store")+'柿川亭</div>'
       +'<div class="stab '+(CUR==="abura"?"on":"")+'" onclick="setStore(\'abura\')">'+ic("flask")+'アブララボ</div>'
@@ -731,6 +765,7 @@ store.suppliers();
 migrate();
 if(!MYNAME)setTimeout(askName,500);
 render();
+startSync();
 if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(function(){});
 </script>
 </body>
