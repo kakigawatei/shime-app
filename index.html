@@ -468,7 +468,7 @@ function orderDetail(sid){
   var sendBtn = closed
     ? '<div class="btn disabled"><span>'+ic("send")+'</span>お休みのため送信できません</div>'
     : (link.href
-      ? '<a class="btn primary" href="'+link.href+'" onclick="markOpened(\''+sid+'\')"><span>'+ic("send")+'</span>'+link.label+'</a>'
+      ? '<button class="btn primary" onclick="sendNow(\''+sid+'\')"><span>'+ic("send")+'</span>'+link.label+'</button>'
       : '<div class="btn disabled">'+link.label+'（マスタで'+link.need+'を登録）</div>');
   var prev='<div class="card cardpad"><label class="lbl-mini">送信プレビュー（タップで直接編集OK）</label>'
     +'<textarea class="input" id="msg_'+sid+'" oninput="editText(\''+sid+'\',this.value)">'+esc(text)+'</textarea></div>';
@@ -630,11 +630,13 @@ function toggleSplit(sid,iid){draft[sid]=draft[sid]||{deliver:"tomorrow",qty:{},
   draft[sid].text=null;var ta=el("msg_"+sid);if(ta)ta.value=buildText(findSup(sid));}
 function setSplit(sid,iid,v){draft[sid].split[iid]=Math.max(0,parseInt(v,10)||0);draft[sid].text=null;var ta=el("msg_"+sid);if(ta)ta.value=buildText(findSup(sid));}
 function editText(sid,v){draft[sid]=draft[sid]||{qty:{},split:{}};draft[sid].text=v;}
+function liveText(sid){var ta=el("msg_"+sid);return ta?ta.value:currentText(sid);}
+function sendNow(sid){var sup=findSup(sid);var text=liveText(sid);draft[sid]=draft[sid]||{qty:{},split:{}};draft[sid].text=text;var link=sendLink(sup,text);if(!link.href){alert("マスタで"+link.need+"を登録してください");return;}saveOrder(sid,"opened");window.location.href=link.href;}
 function markOpened(sid){setTimeout(function(){saveOrder(sid,"opened");},300);}
 function markSent(sid){saveOrder(sid,"sent");toast("送信を記録しました");closeDetail();}
 function saveOrder(sid,status){var sup=findSup(sid);if(!sup)return;var os=store.orders();
-  os.push({id:uid(),ts:Date.now(),dateKey:dayKey(0),store:CUR,supplierId:sid,supplierName:sup.name,channel:sup.channel,text:currentText(sid),by:MYNAME,status:status});store.saveOrders(os);}
-function copyText(sid){var t=currentText(sid);if(navigator.clipboard)navigator.clipboard.writeText(t).then(function(){toast("本文をコピーしました");},function(){fbCopy(t);});else fbCopy(t);saveOrder(sid,"opened");}
+  os.push({id:uid(),ts:Date.now(),dateKey:dayKey(0),store:CUR,supplierId:sid,supplierName:sup.name,channel:sup.channel,text:liveText(sid),by:MYNAME,status:status});store.saveOrders(os);}
+function copyText(sid){var t=liveText(sid);if(navigator.clipboard)navigator.clipboard.writeText(t).then(function(){toast("本文をコピーしました");},function(){fbCopy(t);});else fbCopy(t);saveOrder(sid,"opened");}
 function fbCopy(t){var ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");toast("本文をコピーしました");}catch(e){}document.body.removeChild(ta);}
 function reuse(oid){var o=store.orders().filter(function(x){return x.id===oid;})[0];if(!o)return;draft[o.supplierId]={deliver:"tomorrow",qty:{},split:{},text:o.text};openDetail("order",o.supplierId);}
 function bulkSend(){var sups=store.suppliers().sort(byOrder).filter(function(s){return supplierForStore(s,CUR);});var first=sups.filter(function(s){return statusOf(s).k==="ready";})[0]||sups.filter(function(s){return hasQty(s.id)&&!sentToday(s.id);})[0];
