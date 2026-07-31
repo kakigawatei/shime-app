@@ -457,10 +457,9 @@ function viewKaikei(){
     : '';
   var summary='<div class="card cardpad"><div style="display:flex;align-items:center;justify-content:space-between"><label class="lbl-mini" style="margin:0">今月の速報（'+storeName()+'）</label><span class="pill" style="background:#fff3d9;color:#b8860b">速報</span></div>'
     +'<div style="display:flex;gap:10px;text-align:center;margin-top:12px">'
-    +'<div style="flex:1"><div style="font-size:21px;font-weight:800">'+yen(mSales)+'</div><div class="cwho">売上</div></div>'
-    +'<div style="flex:1"><div style="font-size:21px;font-weight:800">'+mCust+'</div><div class="cwho">客数</div></div>'
-    +'<div style="flex:1"><div style="font-size:21px;font-weight:800">'+yen(avg)+'</div><div class="cwho">客単価</div></div></div>'
-    +'<div class="cwho" style="margin-top:10px">締めアプリ入力ベースの速報（'+recs.length+'日ぶん）。台帳(joe)との突き合わせは後日追加。</div></div>';
+    +'<div style="flex:1"><div style="font-size:21px;font-weight:800">'+yen(mSales)+'</div><div class="cwho">今月の売上</div></div>'
+    +'<div style="flex:1"><div style="font-size:21px;font-weight:800">'+recs.length+'</div><div class="cwho">入力日数</div></div></div>'
+    +'<div class="cwho" style="margin-top:10px">締めアプリ入力ベースの速報。台帳(joe)との突き合わせは後日追加。</div></div>';
   return head
     + closingForm()
     + banner
@@ -541,7 +540,6 @@ function closingForm(){
     +'</div>'
     +'<div class="card cardpad"><label class="lbl-mini">自動計算</label>'
       +'<div class="irow"><div class="iname">売上合計</div><div style="font-weight:800;font-size:20px" id="c_total">'+yen(calc.salesTotal)+'</div></div>'
-      +'<div class="field" style="margin-top:12px"><label>来店客数（任意）</label><input class="input" type="number" inputmode="numeric" id="c_customers" value="'+esc(c.customers==null?"":c.customers)+'" placeholder="分かれば入力（空欄OK）" oninput="cset(\'customers\',this.value)"></div>'
     +'</div>'
     +'<button class="btn primary" onclick="saveClosingRecord()"><span>'+ic("check")+'</span>保存する</button>';
 }
