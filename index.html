@@ -405,11 +405,14 @@ function C_supcard(sup,onclick,extra){
 /* ============================================================
  * render
  * ============================================================ */
+var _lastView="";
 function render(){
   renderHeader(); renderTabbar();
   var m=el("main"); var slide = STATE.detail? " slide":"";
+  var vk=STATE.tab+"|"+(STATE.detail?(STATE.detail.view+":"+(STATE.detail.sid||"")):""); // 同じ画面の再描画ではスクロール位置を保つ
+  var keepScroll=(vk===_lastView); var sc=keepScroll?m.scrollTop:0;
   m.innerHTML='<div class="screen'+slide+'">'+ (STATE.detail? detailScreen() : tabScreen()) +'</div>';
-  m.scrollTop=0;
+  m.scrollTop=sc; _lastView=vk;
 }
 function renderHeader(){
   var h=el("hdr");
