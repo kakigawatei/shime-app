@@ -313,8 +313,8 @@ function seed(){
       items:[it("豚骨のタレ","本"),it("煮干しのタレ","本"),it("塩タレ","本"),it("生姜醤油のタレ","本"),it("味噌だれ 赤(ビリー)","本"),it("ラー油","本"),it("柿川亭のタレ","ケース"),it("メンマ","ケース"),it("にんにく","個"),it("炭酸水","ケース")]},
     {id:uid(),name:"中越鶏卵",channel:"email",contact:"",category:"卵・鶏肉",av:{t:"🥚",bg:"#efe3bf"},order:3,template:"email",stores:["kaki"],
       items:[eggItem()]},
-    {id:uid(),name:"竹内農園",channel:"line",contact:"",category:"野菜・青果",av:{t:"🌿",bg:"#d7ebcf"},order:4,items:[it("マスタード（辛口）","パック"),it("マスタード（旨味）","パック")]},
-    {id:uid(),name:"マルヤマ包装",channel:"line",contact:"",category:"容器・包装資材",av:{t:"📦",bg:"#e4d6bd"},order:5,items:maruyamaItems()},
+    {id:uid(),name:"マルヤマ包装",channel:"line",contact:"",category:"容器・包装資材",av:{t:"📦",bg:"#e4d6bd"},order:4,items:maruyamaItems()},
+    {id:uid(),name:"竹内農園",channel:"line",contact:"",category:"野菜・青果",av:{t:"🌿",bg:"#d7ebcf"},order:5,items:[it("マスタード（辛口）","パック"),it("マスタード（旨味）","パック")]},
     {id:uid(),name:"アルベーロ",channel:"messenger",contact:"",category:"備品・雑貨",av:{t:"💬",bg:"linear-gradient(135deg,#8a5cf6,#e0559b)"},order:6,items:[it("バジル","パック")]}
   ];
   store.saveSuppliers(s); return s;
@@ -787,6 +787,13 @@ function migrate(){
     a7.forEach(function(s){ if(s.name==="マルヤマ包装"){ s.items=maruyamaItems(); ch7=true; } });
     if(ch7) store.saveSuppliers(a7);
     done.maruyama_items_v2=true; store.set(MK,done);
+  }
+  if(!done.supplier_order_v1){
+    var ord={"めんつう":1,"ホクショク":2,"中越鶏卵":3,"マルヤマ包装":4,"竹内農園":5,"アルベーロ":6};
+    var a8=store.suppliers(); var ch8=false;
+    a8.forEach(function(s){ if(ord[s.name]!=null&&s.order!==ord[s.name]){ s.order=ord[s.name]; ch8=true; } });
+    if(ch8) store.saveSuppliers(a8);
+    done.supplier_order_v1=true; store.set(MK,done);
   }
 }
 
