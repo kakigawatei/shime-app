@@ -266,15 +266,22 @@ function fbAuth(){ if(fbTok&&Date.now()<fbExp)return Promise.resolve(fbTok); var
   return fbAnon(); }
 function fsUrl(id){ return "https://firestore.googleapis.com/v1/projects/"+FB.projectId+"/databases/(default)/documents/shime_docs/"+id; }
 function cloudGet(id){ return fbAuth().then(function(t){return fetch(fsUrl(id),{headers:{Authorization:"Bearer "+t}});}).then(function(r){ if(r.status===404)return null; if(!r.ok)throw new Error("get "+r.status); return r.json(); }).then(function(d){ return (d&&d.fields&&d.fields.json)?d.fields.json.stringValue:null; }); }
-function cloudPut(id,jsonStr){ return fbAuth().then(function(t){return fetch(fsUrl(id)+"?updateMask.fieldPaths=json&updateMask.fieldPaths=ts",{method:"PATCH",headers:{Authorization:"Bearer "+t,"Content-Type":"application/json"},body:JSON.stringify({fields:{json:{stringValue:jsonStr},ts:{integerValue:String(Date.now())}}})});}).then(function(r){if(!r.ok)throw new Error("put "+r.status);}); }
+function cloudPut(id,jsonStr){ return fbAuth().then(function(t){return fetch(fsUrl(id)+"?updateMask.fieldPaths=json&updateMask.fieldPaths=ts",{method:"PATCH",keepalive:true,headers:{Authorization:"Bearer "+t,"Content-Type":"application/json"},body:JSON.stringify({fields:{json:{stringValue:jsonStr},ts:{integerValue:String(Date.now())}}})});}).then(function(r){if(!r.ok)throw new Error("put "+r.status);}); }
 function cloudMark(lsKey){ if(!CLOUD_ON)return; var id=null; for(var k in CLOUD) if(CLOUD[k]===lsKey) id=k; if(!id)return;
   setSync("同期中…"); clearTimeout(pushTimers[id]); pushTimers[id]=setTimeout(function(){ var v=localStorage.getItem(lsKey)||""; cloudPut(id,v).then(function(){setSync("同期済");}).catch(function(){setSync("後で同期");}); },700); }
+function flushPushes(){ for(var id in pushTimers){ if(pushTimers[id]){ clearTimeout(pushTimers[id]); pushTimers[id]=null; var v=localStorage.getItem(CLOUD[id])||""; cloudPut(id,v).catch(function(){}); } } } /* 保留中のpushを即送信(閉じる/リロード時のデータ喪失防止) */
+function isEmptyData(s){ if(s==null||s==="") return true; try{var v=JSON.parse(s); if(v==null)return true; if(Array.isArray(v))return v.length===0; if(typeof v==="object")return Object.keys(v).length===0; return false;}catch(e){return false;} }
 function cloudPullAll(){ var ids=Object.keys(CLOUD);
   return Promise.all(ids.map(function(id){ return cloudGet(id).then(function(js){return {id:id,js:js};}).catch(function(){return {id:id,js:undefined};}); })).then(function(res){
     var changed=false; res.forEach(function(r){ var lsKey=CLOUD[r.id];
       if(r.js===undefined){}
       else if(r.js===null){ var local=localStorage.getItem(lsKey); if(local){ cloudPut(r.id,local).catch(function(){}); } }
-      else { var cur=localStorage.getItem(lsKey); if(cur!==r.js){ try{localStorage.setItem(lsKey,r.js);}catch(e){} changed=true; } }
+      else { var cur=localStorage.getItem(lsKey);
+        if(cur!==r.js){
+          if(isEmptyData(r.js) && !isEmptyData(cur)){ cloudPut(r.id,cur).catch(function(){}); } /* 空クラウドでローカルの実データを絶対に上書きしない→逆にローカルをpush */
+          else { try{localStorage.setItem(lsKey,r.js);}catch(e){} changed=true; }
+        }
+      }
     }); return changed; }); }
 function setSync(t){ var e=el("syncst"); if(e)e.textContent=t; }
 function startSync(){ CLOUD_ON=true; setSync("同期中…");
@@ -316,8 +323,8 @@ function seed(){
     {id:uid(),name:"中越鶏卵",channel:"email",contact:"",category:"卵・鶏肉",av:{t:"🥚",bg:"#efe3bf"},order:3,template:"email",stores:["kaki"],
       items:[eggItem()]},
     {id:uid(),name:"マルヤマ包装",channel:"line",contact:"",category:"容器・包装資材",av:{t:"📦",bg:"#e4d6bd"},order:4,flexDeliver:true,items:maruyamaItems()},
-    {id:uid(),name:"竹内農園",channel:"line",contact:"",category:"野菜・青果",av:{t:"🌿",bg:"#d7ebcf"},order:5,items:[it("マスタード（辛口）","パック"),it("マスタード（旨味）","パック")]},
-    {id:uid(),name:"アルベーロ",channel:"messenger",contact:"",category:"備品・雑貨",av:{t:"💬",bg:"linear-gradient(135deg,#8a5cf6,#e0559b)"},order:6,items:[it("バジル","パック")]}
+    {id:uid(),name:"竹内農園",channel:"line",contact:"",category:"野菜・青果",av:{t:"🌿",bg:"#d7ebcf"},order:5,flexDeliver:true,items:[it("マスタード（辛口）","パック"),it("マスタード（旨味）","パック")]},
+    {id:uid(),name:"アルベーロ",channel:"messenger",contact:"",category:"備品・雑貨",av:{t:"💬",bg:"linear-gradient(135deg,#8a5cf6,#e0559b)"},order:6,flexDeliver:true,items:[it("バジル","パック")]}
   ];
   store.saveSuppliers(s); return s;
 }
@@ -758,7 +765,7 @@ function migrate(){
     if(ch2) store.saveSuppliers(a2);
     done.nakagoe_kaki=true; store.set(MK,done);
   }
-  if(!done.presets_v2){ store.set(LS.shoppresets,null); seedPresets(); done.presets_v2=true; store.set(MK,done); }
+  if(!done.presets_v2){ var _pp=store.get(LS.shoppresets,null); if(!_pp||!_pp.length){ store.set(LS.shoppresets,null); seedPresets(); } done.presets_v2=true; store.set(MK,done); } /* 既存の定番があれば絶対に消さない(データ消失防止) */
   if(!done.hokushoku_items_v1){
     var a4=store.suppliers(); var ch4=false;
     a4.forEach(function(s){ if(s.name==="ホクショク"){ s.items=[it("豚骨のタレ","本"),it("煮干しのタレ","本"),it("塩タレ","本"),it("生姜醤油のタレ","本"),it("味噌だれ 赤(ビリー)","本"),it("ラー油","本"),it("柿川亭のタレ","ケース"),it("メンマ","ケース"),it("にんにく","個"),it("炭酸水","ケース")]; ch4=true; } });
@@ -806,6 +813,15 @@ function migrate(){
     if(ch9) store.saveSuppliers(a9);
     done.maruyama_flex_v1=true; store.set(MK,done);
   }
+  if(!done.flex_v2){
+    var a10=store.suppliers(); var chA=false;
+    a10.forEach(function(s){
+      if(s.channel==="messenger"){ if(s.name!=="アルベーロ")s.name="アルベーロ"; s.flexDeliver=true; chA=true; } /* アルベーロ=文字化け修復＋配送不定期 */
+      if(s.name==="竹内農園"&&!s.flexDeliver){ s.flexDeliver=true; chA=true; }
+    });
+    if(chA) store.saveSuppliers(a10);
+    done.flex_v2=true; store.set(MK,done);
+  }
 }
 
 /* init */
@@ -813,13 +829,16 @@ store.suppliers();
 if(!MYNAME)setTimeout(askName,500);
 render();
 startSync(); // クラウドから取得→その後にmigrate()を回す（pullが移行後データを古いクラウド値で上書きする競合を防ぐ）
+window.addEventListener("pagehide",flushPushes);
+document.addEventListener("visibilitychange",function(){ if(document.hidden) flushPushes(); });
+function editingNow(){ return STATE.detail || (el("modal")&&el("modal").classList.contains("on")) || (document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName||"")); }
 if("serviceWorker" in navigator){
   navigator.serviceWorker.register("sw.js").then(function(reg){
     reg.update();
     document.addEventListener("visibilitychange",function(){ if(!document.hidden) reg.update(); });
   }).catch(function(){});
   var swRefreshed=false;
-  navigator.serviceWorker.addEventListener("controllerchange",function(){ if(swRefreshed)return; swRefreshed=true; location.reload(); });
+  navigator.serviceWorker.addEventListener("controllerchange",function(){ if(swRefreshed)return; swRefreshed=true; flushPushes(); if(editingNow()){ return; } location.reload(); }); /* 編集中は自動リロードしない(入力中データ喪失防止) */
 }
 </script>
 </body>
