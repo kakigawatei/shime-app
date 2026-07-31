@@ -278,7 +278,9 @@ function cloudPullAll(){ var ids=Object.keys(CLOUD);
     }); return changed; }); }
 function setSync(t){ var e=el("syncst"); if(e)e.textContent=t; }
 function startSync(){ CLOUD_ON=true; setSync("同期中…");
-  cloudPullAll().then(function(){ setSync("同期済"); render(); }).catch(function(){ setSync("オフライン"); }).then(function(){ pollSync(); }); }
+  cloudPullAll().then(function(){ migrate(); setSync("同期済"); render(); })
+    .catch(function(){ migrate(); setSync("オフライン"); render(); })
+    .then(function(){ pollSync(); }); }
 function pollSync(){
   setInterval(function(){ if(el("modal").classList.contains("on")||STATE.detail)return;
     cloudPullAll().then(function(ch){ setSync("同期済"); if(ch)render(); }).catch(function(){setSync("オフライン");}); },20000);
@@ -768,39 +770,38 @@ function migrate(){
     if(ch3) store.saveSuppliers(a3);
     done.line_items_v1=true; store.set(MK,done);
   }
-  if(!done.takeuchi_items_v2){
+  if(!done.takeuchi_items_v3){
     var a5=store.suppliers(); var ch5=false;
     a5.forEach(function(s){ if(s.name==="竹内農園"){ s.items=[it("マスタード（辛口）","パック"),it("マスタード（旨味）","パック")]; ch5=true; } });
     if(ch5) store.saveSuppliers(a5);
-    done.takeuchi_items_v2=true; store.set(MK,done);
+    done.takeuchi_items_v3=true; store.set(MK,done);
   }
-  if(!done.egg_check_v1){
+  if(!done.egg_check_v2){
     var a6=store.suppliers(); var ch6=false;
     a6.forEach(function(s){ if(s.name==="中越鶏卵"){ s.items=[eggItem()]; ch6=true; } });
     if(ch6) store.saveSuppliers(a6);
-    done.egg_check_v1=true; store.set(MK,done);
+    done.egg_check_v2=true; store.set(MK,done);
   }
-  if(!done.maruyama_items_v2){
+  if(!done.maruyama_items_v3){
     var a7=store.suppliers(); var ch7=false;
     a7.forEach(function(s){ if(s.name==="マルヤマ包装"){ s.items=maruyamaItems(); ch7=true; } });
     if(ch7) store.saveSuppliers(a7);
-    done.maruyama_items_v2=true; store.set(MK,done);
+    done.maruyama_items_v3=true; store.set(MK,done);
   }
-  if(!done.supplier_order_v1){
+  if(!done.supplier_order_v2){
     var ord={"めんつう":1,"ホクショク":2,"中越鶏卵":3,"マルヤマ包装":4,"竹内農園":5,"アルベーロ":6};
     var a8=store.suppliers(); var ch8=false;
     a8.forEach(function(s){ if(ord[s.name]!=null&&s.order!==ord[s.name]){ s.order=ord[s.name]; ch8=true; } });
     if(ch8) store.saveSuppliers(a8);
-    done.supplier_order_v1=true; store.set(MK,done);
+    done.supplier_order_v2=true; store.set(MK,done);
   }
 }
 
 /* init */
 store.suppliers();
-migrate();
 if(!MYNAME)setTimeout(askName,500);
 render();
-startSync();
+startSync(); // クラウドから取得→その後にmigrate()を回す（pullが移行後データを古いクラウド値で上書きする競合を防ぐ）
 if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(function(){});
 </script>
 </body>
