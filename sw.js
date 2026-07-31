@@ -1,5 +1,5 @@
 /* 締めアプリ service worker — アプリシェルをキャッシュ。データはlocalStorage（将来Firestore）。 */
-var CACHE_VERSION = "shime-v33";
+var CACHE_VERSION = "shime-v34";
 var SHELL = ["./", "./index.html", "./manifest.webmanifest"];
 
 self.addEventListener("install", function(e){
@@ -16,7 +16,7 @@ self.addEventListener("activate", function(e){
 self.addEventListener("fetch", function(e){
   var url = e.request.url;
   // 外部API（将来のFirestore等）はキャッシュせずネットワーク直行
-  if(url.indexOf("googleapis.com")>=0 || e.request.method!=="GET"){ return; }
+  if(url.indexOf("googleapis.com")>=0 || url.indexOf("docs.google.com")>=0 || e.request.method!=="GET"){ return; }
   // index.html はネットワーク優先（更新反映）、失敗時キャッシュ
   if(e.request.mode==="navigate" || url.indexOf("index.html")>=0){
     e.respondWith(fetch(e.request).then(function(r){

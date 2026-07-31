@@ -306,6 +306,55 @@ function cOtherTotal(c){ var s=0; (c.other||[]).forEach(function(o){ s+=num(o.am
 function cCash(c){ return num(c.kenbaiSales)+num(c.couponSales)+cOtherTotal(c); } /* 封筒に入れる金額＝エニデリ以外(券売機＋クーポン＋その他現金) */
 function cCalc(c){ if(!c) return {salesTotal:0,customers:0};
   return { salesTotal:num(c.kenbaiSales)+num(c.anydeliSales)+num(c.couponSales)+cOtherTotal(c), customers:num(c.customers) }; }
+
+/* ---------- 台帳(ジョー)との突合 ---------- */
+var LEDGER={ id:"1cMfvuwBRc6tnKoeIPAgM5wGryUXyeV5fL2XPkoIcTT8", tabs:{kaki:"🍜日次：柿川亭", abura:"🧴日次：アブララボ"} };
+var _ledgerCache={}; // store -> {ts, map}
+function csvParse(text){ var rows=[],row=[],f="",i=0,q=false,c; while(i<text.length){ c=text[i]; if(q){ if(c==='"'){ if(text[i+1]==='"'){f+='"';i++;} else q=false; } else f+=c; } else { if(c==='"')q=true; else if(c===','){row.push(f);f="";} else if(c==='\n'){row.push(f);rows.push(row);row=[];f="";} else if(c==='\r'){} else f+=c; } i++; } if(f.length||row.length){row.push(f);rows.push(row);} return rows; }
+function canonD(s){ var p=(""+s).split("-"); if(p.length<3) return ""; return (+p[0])+"-"+(+p[1])+"-"+(+p[2]); }
+function fetchLedger(store){ // returns Promise(map: canonDate -> {kenbai,anydeli,coupon,uriage})
+  var cc=_ledgerCache[store]; if(cc && (Date.now()-cc.ts)<120000) return Promise.resolve(cc.map);
+  var tab=LEDGER.tabs[store]; if(!tab) return Promise.resolve({});
+  return fetch("https://docs.google.com/spreadsheets/d/"+LEDGER.id+"/gviz/tq?tqx=out:csv&sheet="+encodeURIComponent(tab)).then(function(r){return r.text();}).then(function(t){
+    var rows=csvParse(t), map={};
+    rows.forEach(function(row){ var d=(row[0]||"").trim(); if(!/^\d{4}-\d{2}-\d{2}$/.test(d)) return; map[canonD(d)]={kenbai:num(row[2]),anydeli:num(row[3]),coupon:num(row[5]),uriage:num(row[7])}; });
+    _ledgerCache[store]={ts:Date.now(),map:map}; return map;
+  });
+}
+var _totsugoBusy=false;
+function renderTotsugo(){
+  if(_totsugoBusy) return; _totsugoBusy=true;
+  var store=CUR;
+  fetchLedger(store).then(function(map){
+    _totsugoBusy=false;
+    if(CUR!==store) return; // 店舗が切り替わっていたら破棄
+    var box=el("totsugo"); if(!box) return;
+    var rows="", nDiff=0, nMatch=0;
+    for(var i=0;i<14;i++){
+      var dk=dayKey(-i), cd=canonD(dk); var sh=getClosing(store,dk); var lg=map[cd];
+      if(!sh && !lg) continue;
+      var d=todayPlus(-i); var dlabel=(d.getMonth()+1)+"/"+d.getDate()+"（"+WD[d.getDay()]+"）";
+      var shT=sh?cCalc(sh).salesTotal:null, lgT=lg?lg.uriage:null;
+      var right, cls="";
+      if(shT!=null && lgT!=null){
+        var diff=Math.round(shT-lgT);
+        if(Math.abs(diff)<1){ right='<span class="st-sent" style="padding:2px 8px;border-radius:8px;font-size:12px;font-weight:700">✓ 一致</span>'; nMatch++; }
+        else { right='<span class="st-input" style="padding:2px 8px;border-radius:8px;font-size:12px;font-weight:800;background:#fdecec;color:#c0392b">⚠ 差額 '+yen(diff)+'</span>'; nDiff++; }
+      } else if(shT!=null){ right='<span class="cwho">台帳 未反映</span>'; }
+      else { right='<span style="color:var(--warning,#d9691f);font-weight:700;font-size:12px">締め 未入力</span>'; }
+      var sub = (shT!=null&&lgT!=null&&Math.abs(shT-lgT)>=1)
+        ? '<div class="cwho" style="margin-top:3px">締め '+yen(shT)+' ／ 台帳 '+yen(lgT)+'　（券:'+yen(sh?num(sh.kenbaiSales):0)+'/'+yen(lg.kenbai)+' any:'+yen(sh?num(sh.anydeliSales):0)+'/'+yen(lg.anydeli)+' ｸｰﾎﾟﾝ:'+yen(sh?num(sh.couponSales):0)+'/'+yen(lg.coupon)+'）</div>'
+        : '<div class="cwho" style="margin-top:3px">締め '+(shT!=null?yen(shT):"—")+' ／ 台帳 '+(lgT!=null?yen(lgT):"—")+'</div>';
+      rows+='<div class="irow" style="display:block;padding:10px 4px"><div style="display:flex;align-items:center;justify-content:space-between"><div class="iname">'+dlabel+'</div>'+right+'</div>'+sub+'</div>';
+    }
+    if(!rows) rows='<div class="cwho">まだ突合できる日がありません（締め入力＋台帳の両方が揃うと表示されます）。</div>';
+    box.innerHTML='<div class="card cardpad">'
+      +'<div class="cwho" style="margin-bottom:6px">締めアプリの入力と、ジョーの台帳（毎朝同期）を日ごとに突合。差額があれば赤で表示します。'+(nDiff?'⚠差額'+nDiff+'件':(nMatch?'✓すべて一致':''))+'</div>'
+      +rows+'</div>';
+  }).catch(function(){
+    _totsugoBusy=false; var box=el("totsugo"); if(box) box.innerHTML='<div class="card cardpad"><div class="cwho">台帳を読み込めませんでした（ネット接続やシート共有設定をご確認ください）。</div></div>';
+  });
+}
 var cdraft={};
 function it(name,unit,stores){ return {id:uid(),name:name,unit:unit||"",stores:stores||["kaki","abura"]}; }
 function eggItem(){ return {id:uid(),name:"卵",unit:"kg",check:true,lot:5,stores:["kaki"]}; }
@@ -414,6 +463,7 @@ function render(){
   var keepScroll=(vk===_lastView); var sc=keepScroll?m.scrollTop:0;
   m.innerHTML='<div class="screen'+slide+'">'+ (STATE.detail? detailScreen() : tabScreen()) +'</div>';
   m.scrollTop=sc; _lastView=vk;
+  if(!STATE.detail && STATE.tab==="kaikei" && el("totsugo")) renderTotsugo();
 }
 function renderHeader(){
   var h=el("hdr");
@@ -475,6 +525,7 @@ function viewKaikei(){
     + closingForm()
     + banner
     +'<div class="sec mt" style="margin-bottom:14px"><h2 style="font-size:var(--fs-sec)">今月の速報</h2></div>'+summary
+    +'<div class="sec mt" style="margin-bottom:14px"><h2 style="font-size:var(--fs-sec)">台帳との突合（ジョー）</h2></div><div id="totsugo"><div class="card cardpad"><div class="cwho">読み込み中…</div></div></div>'
     +'<div class="sec mt" style="margin-bottom:14px"><h2 style="font-size:var(--fs-sec)">最近の履歴</h2></div>'+ histCard(6);
 }
 
