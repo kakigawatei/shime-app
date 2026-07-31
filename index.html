@@ -655,7 +655,7 @@ function viewShop(){
   var list=store.shopping().filter(function(x){return (x.store===CUR||x.store==="common")&&(x.qty||0)>0;});
   var buyRows=list.length?list.map(function(x){
     return '<div class="check'+(x.done?' done':'')+'"><div class="cbox'+(x.done?' on':'')+'" onclick="toggleShop(\''+x.id+'\')">'+ic("check")+'</div>'
-      +'<div class="ctxt" style="min-width:0">'+esc(x.text)+' <b>'+(x.qty||1)+'</b>'+(x.unit?esc(x.unit):"")+' '+C_pill(x.store==="common"?"共通":storeName(),"ch-sms")+(x.presetId?"":' '+C_pill("突発","ch-messenger"))+'</div>'
+      +'<div class="ctxt" style="min-width:0">'+esc(x.text)+' <b>'+(x.qty||1)+'</b>'+(x.unit?esc(x.unit):"")+' '+C_pill(STORES[x.store]?STORES[x.store].name:"共通","ch-sms")+(x.presetId?"":' '+C_pill("突発","ch-messenger"))+'</div>'
       +'<button class="del" onclick="delShop(\''+x.id+'\')">×</button></div>';
   }).join(""):'<div class="empty">まだありません（上で個数を選ぶか、突発を追加）</div>';
   return C_sec("cart","買い出しリスト")
@@ -663,7 +663,7 @@ function viewShop(){
     +'<div class="card cardpad"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><label class="lbl-mini" style="margin:0">定番（個数を選ぶだけ）</label><span class="link" onclick="editPresets()">定番を編集</span></div><div class="items">'+defRows+'</div></div>'
     +'<div class="card cardpad"><label class="lbl-mini">突発（その他・自由に追加）</label>'
       +'<div class="addrow"><input class="input" id="shopin" placeholder="品名（例：割り箸）"><input class="input" id="shopunit" placeholder="単位" style="max-width:74px"></div>'
-      +'<div class="addrow" style="margin-top:8px"><select class="input" id="shopscope"><option value="'+CUR+'">'+esc(storeName())+'</option><option value="common">共通</option></select><button onclick="addShop()">'+ic("plus")+'追加</button></div></div>'
+      +'<div class="addrow" style="margin-top:8px"><select class="input" id="shopscope"><option value="kaki"'+(CUR==="kaki"?" selected":"")+'>柿川亭</option><option value="abura"'+(CUR==="abura"?" selected":"")+'>アブララボ</option></select><button onclick="addShop()">'+ic("plus")+'追加</button></div></div>'
     +'<div class="sec mt" style="margin-bottom:12px"><h2 style="font-size:var(--fs-sec)">買うものリスト</h2></div>'
     +'<div class="card">'+buyRows+'</div>'
     +'<button class="btn ghost mt" onclick="clearDoneShop()">買えたもの（チェック済）を消す</button>';
