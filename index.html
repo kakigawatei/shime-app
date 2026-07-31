@@ -233,13 +233,15 @@ var store = {
   shopping:function(){ return store.get(LS.shopping,[]); },
   saveShopping:function(a){ store.set(LS.shopping,a); }
 };
-function it(name,unit,split){ return {id:uid(),name:name,unit:unit||"",split:!!split}; }
+function it(name,unit,stores){ return {id:uid(),name:name,unit:unit||"",stores:stores||["kaki","abura"]}; }
+function itemStores(item){ return (item.stores&&item.stores.length)?item.stores:["kaki","abura"]; }
+function itemForStore(item,st){ return itemStores(item).indexOf(st)>=0; }
 function seed(){
   var s=[
     {id:uid(),name:"めんつう",channel:"sms",contact:"",category:"ラーメン麺",av:{t:"め",bg:"#243a6b"},order:1,
-      items:[it("太麺","玉"),it("細麺","玉"),it("冷凍12番150g","パック",true),it("冷凍16番太麺","玉")]},
+      items:[it("太麺","玉"),it("細麺","玉"),it("冷凍12番150g","パック"),it("冷凍16番太麺","玉")]},
     {id:uid(),name:"ホクショク",channel:"sms",contact:"",category:"食材・調味料",av:{t:"ホ",bg:"#7a2230"},order:2,
-      items:[it("豚骨のタレ","本",true),it("柿川亭のタレ","ケース",true),it("メンマ","ケース"),it("にんにく","個")]},
+      items:[it("豚骨のタレ","本"),it("柿川亭のタレ","ケース",["kaki"]),it("メンマ","ケース"),it("にんにく","個")]},
     {id:uid(),name:"中越鶏卵",channel:"email",contact:"",category:"卵・鶏肉",av:{t:"🥚",bg:"#efe3bf"},order:3,
       items:[it("卵","パック")]},
     {id:uid(),name:"竹内農園",channel:"line",contact:"",category:"野菜・青果",av:{t:"🌿",bg:"#d7ebcf"},order:4,items:[]},
@@ -274,10 +276,9 @@ function buildText(sup){
   var d=draft[sup.id]||{}; var di=deliverInfo(d.deliver||"tomorrow");
   var L=["お世話になっております。", di.rel+WD[di.d.getDay()]+"曜日", storeName()];
   (sup.items||[]).forEach(function(item){
+    if(!itemForStore(item,CUR)) return;
     var q=(d.qty&&d.qty[item.id])||0;
-    if(q>0){var line=item.name+q+(item.unit||"");
-      if(item.split){var sp=(d.split&&d.split[item.id])||0; if(sp>0) line+="（内"+sp+"は"+otherName()+"）";}
-      L.push(line);}
+    if(q>0){ L.push(item.name+q+(item.unit||"")); }
   });
   L.push("お願いいたします🙇");
   return L.join("\n");
@@ -305,7 +306,9 @@ function sendLink(sup,text){
  * ============================================================ */
 function C_pill(text,cls){return '<span class="pill '+cls+'">'+esc(text)+'</span>';}
 function C_status(st){return '<span class="status '+st.cls+'">'+esc(st.t)+'</span>';}
-function C_avatar(sup){var bg=sup.av&&sup.av.bg||"#888";var t=sup.av&&sup.av.t||sup.name.slice(0,1);
+function C_avatar(sup){var av=sup.av||{};
+  if(av.img) return '<div class="avatar" style="background-image:url('+av.img+');background-size:cover;background-position:center"></div>';
+  var bg=av.bg||"#888";var t=av.t||sup.name.slice(0,1);
   return '<div class="avatar" style="background:'+bg+'">'+esc(t)+'</div>';}
 function C_sec(icon,title){return '<div class="sec"><div class="sicon">'+ic(icon)+'</div><h2>'+esc(title)+'</h2></div>';}
 function C_supcard(sup,onclick,extra){
@@ -401,15 +404,13 @@ function orderDetail(sid){
   var head='<div class="card"><div class="suprow">'+C_avatar(sup)+'<div class="supmid"><div class="supname">'+esc(sup.name)+' '+C_pill(CHANNELS[sup.channel],"ch-"+sup.channel)+'</div><div class="supcat">'+esc(sup.category||"")+'</div></div>'+C_status(st)+'</div></div>';
   var seg='<label class="lbl-mini">お届け希望日</label><div class="seg">'
     +segBtn(sid,"today","本日")+segBtn(sid,"tomorrow","明日")+segBtn(sid,"day2","明後日")+'</div>';
-  var items = (sup.items||[]).length ? '<div class="card cardpad"><label class="lbl-mini">数量</label><div class="items">'+(sup.items||[]).map(function(item){
-      var q=d.qty[item.id]||0; var splitOn=item.split&&d.split[item.id]!=null;
-      return '<div class="irow"><div><div class="iname">'+esc(item.name)+'<span class="iunit">'+esc(item.unit||"")+'</span></div>'
-        +(item.split?'<span class="isplit" onclick="toggleSplit(\''+sid+'\',\''+item.id+'\')">内訳（'+esc(otherName())+'分）を付ける</span>'
-          +'<div class="isplitrow'+(splitOn?' on':'')+'" id="sr_'+sid+'_'+item.id+'">うち'+esc(otherName())+' <input type="number" min="0" value="'+(d.split[item.id]||0)+'" onchange="setSplit(\''+sid+'\',\''+item.id+'\',this.value)"></div>':'')
-        +'</div>'
+  var shownItems=(sup.items||[]).filter(function(item){return itemForStore(item,CUR);});
+  var items = shownItems.length ? '<div class="card cardpad"><label class="lbl-mini">数量（'+esc(storeName())+'）</label><div class="items">'+shownItems.map(function(item){
+      var q=d.qty[item.id]||0;
+      return '<div class="irow"><div class="iname">'+esc(item.name)+'<span class="iunit">'+esc(item.unit||"")+'</span></div>'
         +'<div class="stepper"><button onclick="qty(\''+sid+'\',\''+item.id+'\',-1)">−</button><span class="qv'+(q>0?' hot':'')+'" id="q_'+sid+'_'+item.id+'">'+q+'</span><button onclick="qty(\''+sid+'\',\''+item.id+'\',1)">＋</button></div></div>';
     }).join("")+'</div></div>'
-    : '<div class="card cardpad empty">品目が未登録です。<span class="link" onclick="openDetail(\'master\',\''+sid+'\')">マスタで追加</span></div>';
+    : '<div class="card cardpad empty">'+esc(storeName())+'向けの品目が未登録です。<span class="link" onclick="openDetail(\'master\',\''+sid+'\')">マスタで追加</span></div>';
   var text=d.text!=null?d.text:buildText(sup);
   var link=sendLink(sup,text);
   var sendBtn = link.href
@@ -435,24 +436,49 @@ function viewMaster(){
     +cards
     +'<button class="btn sec mt" onclick="addSupplier()"><span>'+ic("plus")+'</span>業者を追加</button>';
 }
+var SWATCHES=["#243a6b","#7a2230","#2f6f5e","#c8632b","#b26a1c","#6a3fd0","#2a8f4e","#555555","#efe3bf","#d7ebcf","#e4d6bd","#e9d5ec"];
+var editAv=null, editAvSid=null;
+function ensureEditAv(sid){ if(editAvSid!==sid){ var s=findSup(sid); editAv=Object.assign({t:"",bg:"#888888",img:""}, s.av||{}); editAvSid=sid; } }
+function avRefresh(sid){ var p=el("av_prev"); if(p) p.innerHTML=C_avatar({name:findSup(sid).name, av:editAv}); }
+function avGlyph(sid,v){ ensureEditAv(sid); editAv.t=v; editAv.img=""; avRefresh(sid); }
+function avColor(sid,hex){ ensureEditAv(sid); editAv.bg=hex; editAv.img=""; var i=el("m_av_bg"); if(i)i.value=hex; avRefresh(sid); }
+function avClearImg(sid){ ensureEditAv(sid); editAv.img=""; avRefresh(sid); toast("画像を消しました"); }
+function avImg(sid,input){ ensureEditAv(sid); var f=input.files&&input.files[0]; if(!f) return;
+  var r=new FileReader(); r.onload=function(e){ var img=new Image(); img.onload=function(){ var sz=160; var c=document.createElement("canvas"); c.width=sz; c.height=sz; var ctx=c.getContext("2d");
+    var m=Math.min(img.width,img.height); ctx.drawImage(img,(img.width-m)/2,(img.height-m)/2,m,m,0,0,sz,sz);
+    editAv.img=c.toDataURL("image/jpeg",0.82); avRefresh(sid); toast("画像を設定しました"); }; img.src=e.target.result; };
+  r.readAsDataURL(f); }
 function masterDetail(sid){
-  var s=findSup(sid); if(!s) return "";
+  var s=findSup(sid); if(!s) return ""; ensureEditAv(sid);
   var cl=s.channel==="sms"?"携帯番号（SMS送信先）":s.channel==="email"?"メールアドレス":s.channel==="line"?"LINE（メモ・任意）":"Messenger（メモ・任意）";
   var head='<div class="card"><div class="suprow">'+C_avatar(s)+'<div class="supmid"><div class="supname">'+esc(s.name)+'</div><div class="supcat">'+esc(s.category||"")+'</div></div></div></div>';
+  var swat=SWATCHES.map(function(h){return '<button type="button" onclick="avColor(\''+sid+'\',\''+h+'\')" style="width:30px;height:30px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--border);background:'+h+';cursor:pointer"></button>';}).join("");
+  var avblock='<div class="field"><label>アイコン</label>'
+    +'<div style="display:flex;align-items:center;gap:14px;margin-bottom:12px"><div id="av_prev">'+C_avatar({name:s.name,av:editAv})+'</div>'
+    +'<input class="input" id="m_av_t" value="'+esc(editAv.t||"")+'" placeholder="絵文字や1〜2文字（例：め / 🥚）" oninput="avGlyph(\''+sid+'\',this.value)"></div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">'+swat+'</div>'
+    +'<input type="hidden" id="m_av_bg" value="'+esc(editAv.bg||"")+'">'
+    +'<div class="btnrow"><label class="btn sec" style="cursor:pointer"><span>'+ic("plus")+'</span>写真を選ぶ<input type="file" accept="image/*" style="display:none" onchange="avImg(\''+sid+'\',this)"></label>'
+    +'<button class="btn ghost" onclick="avClearImg(\''+sid+'\')">写真を消す</button></div>'
+    +'</div>';
   var form='<div class="card cardpad">'
     +'<div class="field"><label>業者名</label><input class="input" id="m_name" value="'+esc(s.name)+'"></div>'
     +'<div class="field"><label>カテゴリ</label><input class="input" id="m_cat" value="'+esc(s.category||"")+'"></div>'
     +'<div class="field"><label>連絡ツール</label><select class="input" id="m_ch">'+Object.keys(CHANNELS).map(function(c){return '<option value="'+c+'" '+(c===s.channel?"selected":"")+'>'+CHANNELS[c]+'</option>';}).join("")+'</select></div>'
     +'<div class="field"><label>'+cl+'</label><input class="input" id="m_contact" value="'+esc(s.contact||"")+'"></div>'
+    +avblock
     +'<button class="btn primary" onclick="saveSupplier(\''+sid+'\')"><span>'+ic("check")+'</span>保存</button>'
     +'</div>';
-  var items='<div class="card cardpad"><label class="lbl-mini">定番品目</label><div class="items">'
+  var items='<div class="card cardpad"><label class="lbl-mini">定番品目（店舗ごとに設定可）</label><div class="items">'
     +((s.items||[]).length?(s.items||[]).map(function(item){
-      return '<div class="irow"><div class="iname">'+esc(item.name)+'<span class="iunit">'+esc(item.unit||"")+'</span>'+(item.split?' '+C_pill("内訳可","ch-email"):'')+'</div><button class="del" onclick="delItem(\''+sid+'\',\''+item.id+'\')">削除</button></div>';
+      return '<div class="irow"><div class="iname">'+esc(item.name)+'<span class="iunit">'+esc(item.unit||"")+'</span> '
+        +'<span onclick="cycleItemStore(\''+sid+'\',\''+item.id+'\')" style="cursor:pointer">'+storeTag(item)+'</span></div>'
+        +'<button class="del" onclick="delItem(\''+sid+'\',\''+item.id+'\')">削除</button></div>';
     }).join(""):'<div class="empty">まだありません</div>')
     +'</div>'
-    +'<div class="addrow"><input class="input" id="ain_'+sid+'" placeholder="品目名"><input class="input" id="au_'+sid+'" placeholder="単位" style="max-width:80px"><button onclick="addItem(\''+sid+'\')">追加</button></div>'
-    +'<label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:var(--sub)"><input type="checkbox" id="asp_'+sid+'" style="width:20px;height:20px"> 追加品目に「内訳（他店舗分）」を使う</label>'
+    +'<div class="addrow"><input class="input" id="ain_'+sid+'" placeholder="品目名"><input class="input" id="au_'+sid+'" placeholder="単位" style="max-width:74px"></div>'
+    +'<div class="addrow" style="margin-top:8px"><select class="input" id="asc_'+sid+'"><option value="both">両方の店舗</option><option value="kaki">柿川亭のみ</option><option value="abura">油ラボのみ</option></select><button onclick="addItem(\''+sid+'\')">追加</button></div>'
+    +'<div class="cwho" style="margin-top:8px">※品目のタグをタップすると「両方／柿川亭／油ラボ」を切り替えられます</div>'
     +'</div>';
   return head+form+items+'<div style="text-align:center;margin-top:8px"><button class="del" onclick="delSupplier(\''+sid+'\')">この業者を削除</button></div>';
 }
@@ -461,13 +487,17 @@ function masterDetail(sid){
 function viewShop(){
   var list=store.shopping().filter(function(x){return x.store===CUR||x.store==="common";});
   var rows=list.length?'<div class="card">'+list.map(function(x){
+    var q=x.qty||1, unit=x.unit||"";
     return '<div class="check'+(x.done?' done':'')+'"><div class="cbox'+(x.done?' on':'')+'" onclick="toggleShop(\''+x.id+'\')">'+ic("check")+'</div>'
-      +'<div class="ctxt">'+esc(x.text)+' '+C_pill(x.store==="common"?"共通":storeName(),"ch-sms")+'</div>'
-      +'<div class="cwho">'+esc(x.by||"")+'</div><button class="del" onclick="delShop(\''+x.id+'\')">×</button></div>';
+      +'<div class="ctxt" style="min-width:0"><div>'+esc(x.text)+' '+C_pill(x.store==="common"?"共通":storeName(),"ch-sms")+'</div>'
+      +'<div class="cwho">'+esc(x.by||"")+'</div></div>'
+      +'<div class="stepper"><button onclick="shopQty(\''+x.id+'\',-1)">−</button><span class="qv'+(q>0?" hot":"")+'">'+q+'</span><button onclick="shopQty(\''+x.id+'\',1)">＋</button></div>'
+      +(unit?'<span class="iunit" style="min-width:40px">'+esc(unit)+'</span>':'<span style="width:40px"></span>')
+      +'<button class="del" onclick="delShop(\''+x.id+'\')">×</button></div>';
   }).join("")+'</div>':'<div class="card empty">まだ何もありません</div>';
   return C_sec("cart","買い出しリスト")
-    +'<div class="lead">スーパー等で買うものの共有メモ。追加した店舗＋「共通」が表示されます。</div>'
-    +'<div class="addrow"><input class="input" id="shopin" placeholder="買うものを追加"><button onclick="addShop(false)">'+ic("plus")+'</button></div>'
+    +'<div class="lead">スーパー等で買うものの共有メモ。品名と単位を入れて、個数は−＋で調整できます。追加した店舗＋「共通」が表示されます。</div>'
+    +'<div class="addrow"><input class="input" id="shopin" placeholder="品名（例：青ネギ）"><input class="input" id="shopunit" placeholder="単位" style="max-width:90px"><button onclick="addShop(false)">'+ic("plus")+'</button></div>'
     +'<button class="btn ghost" style="margin-top:8px" onclick="addShop(true)">＋ 共通として追加</button>'
     +'<div class="mt">'+rows+'</div>'
     +'<button class="btn ghost mt" onclick="clearDoneShop()">完了済みを削除</button>';
@@ -504,17 +534,26 @@ function bulkSend(){var sups=store.suppliers().sort(byOrder);var first=sups.filt
   if(!first){toast("先に数量を入力してください");return;}openDetail("order",first.id);}
 
 /* master */
-function addItem(sid){var nm=el("ain_"+sid).value.trim();if(!nm)return;var unit=el("au_"+sid).value.trim();var sp=el("asp_"+sid).checked;
-  var a=store.suppliers();var s=a.filter(function(x){return x.id===sid;})[0];s.items=s.items||[];s.items.push(it(nm,unit,sp));store.saveSuppliers(a);render();}
+function storeTag(item){var st=itemStores(item);if(st.length>=2)return C_pill("両方","ch-line");return C_pill(STORES[st[0]]?STORES[st[0]].name:st[0],"ch-sms");}
+function addItem(sid){var nm=el("ain_"+sid).value.trim();if(!nm)return;var unit=el("au_"+sid).value.trim();var sc=el("asc_"+sid)?el("asc_"+sid).value:"both";
+  var stores=sc==="both"?["kaki","abura"]:[sc];
+  var a=store.suppliers();var s=a.filter(function(x){return x.id===sid;})[0];s.items=s.items||[];s.items.push(it(nm,unit,stores));store.saveSuppliers(a);render();}
+function cycleItemStore(sid,iid){var a=store.suppliers();var s=a.filter(function(x){return x.id===sid;})[0];var item=(s.items||[]).filter(function(i){return i.id===iid;})[0];if(!item)return;
+  var cur=itemStores(item).slice().sort().join(",");
+  item.stores = cur==="abura,kaki" ? ["kaki"] : (cur==="kaki" ? ["abura"] : ["kaki","abura"]);
+  store.saveSuppliers(a);render();}
 function delItem(sid,iid){var a=store.suppliers();var s=a.filter(function(x){return x.id===sid;})[0];s.items=(s.items||[]).filter(function(i){return i.id!==iid;});store.saveSuppliers(a);render();}
 function saveSupplier(sid){var a=store.suppliers();var s=a.filter(function(x){return x.id===sid;})[0];
   s.name=el("m_name").value.trim()||s.name;s.category=el("m_cat").value.trim();s.channel=el("m_ch").value;s.contact=el("m_contact").value.trim();
+  ensureEditAv(sid); if(el("m_av_t")) editAv.t=el("m_av_t").value.trim();
+  var av={t:editAv.t||"",bg:editAv.bg||"#888888",img:editAv.img||""}; if(!av.img&&!av.t) av.t=s.name.slice(0,1); s.av=av;
   store.saveSuppliers(a);toast("保存しました");render();}
 function delSupplier(sid){if(!confirm("この業者を削除しますか？"))return;store.saveSuppliers(store.suppliers().filter(function(x){return x.id!==sid;}));closeDetail();}
 function addSupplier(){var a=store.suppliers();a.push({id:uid(),name:"新しい業者",channel:"sms",contact:"",category:"",av:{t:"新",bg:"#8a8a80"},order:a.length+1,items:[]});store.saveSuppliers(a);var nw=a[a.length-1];openDetail("master",nw.id);}
 
 /* shopping */
-function addShop(common){var i=el("shopin");var v=i.value.trim();if(!v){toast("品名を入力");return;}var a=store.shopping();a.push({id:uid(),text:v,store:common?"common":CUR,done:false,by:MYNAME,ts:Date.now()});store.saveShopping(a);i.value="";render();}
+function addShop(common){var i=el("shopin");var v=i.value.trim();if(!v){toast("品名を入力");return;}var u=el("shopunit")?el("shopunit").value.trim():"";var a=store.shopping();a.push({id:uid(),text:v,unit:u,qty:1,store:common?"common":CUR,done:false,by:MYNAME,ts:Date.now()});store.saveShopping(a);i.value="";if(el("shopunit"))el("shopunit").value="";render();}
+function shopQty(id,d){var a=store.shopping();a.forEach(function(x){if(x.id===id){x.qty=Math.max(0,(x.qty||1)+d);}});store.saveShopping(a);render();}
 function toggleShop(id){var a=store.shopping();a.forEach(function(x){if(x.id===id){x.done=!x.done;x.doneBy=x.done?MYNAME:"";}});store.saveShopping(a);render();}
 function delShop(id){store.saveShopping(store.shopping().filter(function(x){return x.id!==id;}));render();}
 function clearDoneShop(){store.saveShopping(store.shopping().filter(function(x){return !x.done;}));render();}
