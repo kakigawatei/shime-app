@@ -246,7 +246,7 @@ var store = {
   saveShoppresets:function(a){ store.set(LS.shoppresets,a); }
 };
 function seedPresets(){
-  var names=[["青ネギ","袋"],["白ネギ","袋"],["レモン","個"],["りんご","個"],["ぶどう","パック"],["チーズ",""],["梅",""],["ゆずこしょう",""],["青じそ","袋"],["わさび",""],["キムチ",""],["炭酸水","本"]];
+  var names=[["青ネギ","パック"],["白ネギ","パック"],["リンゴジュース","本"],["ブドウジュース","本"],["パインジュース","本"],["チーズ","袋"],["梅","本"],["柚子胡椒","本"],["青じそ","本"],["わさび","本"],["キムチ","パック"],["炭酸水","本"]];
   var a=names.map(function(n){return {id:uid(),name:n[0],unit:n[1]};});
   store.saveShoppresets(a); return a;
 }
@@ -270,8 +270,8 @@ function seed(){
       items:[it("太麺","箱"),it("細麺","箱"),it("グルテンフリー","箱")]},
     {id:uid(),name:"ホクショク",channel:"sms",contact:"",category:"食材・調味料",av:{t:"ホ",bg:"#7a2230"},order:2,
       items:[it("豚骨のタレ","本"),it("柿川亭のタレ","ケース",["kaki"]),it("メンマ","ケース"),it("にんにく","個")]},
-    {id:uid(),name:"中越鶏卵",channel:"email",contact:"",category:"卵・鶏肉",av:{t:"🥚",bg:"#efe3bf"},order:3,
-      items:[it("卵","パック")]},
+    {id:uid(),name:"中越鶏卵",channel:"email",contact:"",category:"卵・鶏肉",av:{t:"🥚",bg:"#efe3bf"},order:3,template:"email",stores:["kaki"],
+      items:[it("卵","kg")]},
     {id:uid(),name:"竹内農園",channel:"line",contact:"",category:"野菜・青果",av:{t:"🌿",bg:"#d7ebcf"},order:4,items:[]},
     {id:uid(),name:"マルヤマ包装",channel:"line",contact:"",category:"容器・包装資材",av:{t:"📦",bg:"#e4d6bd"},order:5,items:[]},
     {id:uid(),name:"アルベーロ",channel:"messenger",contact:"",category:"備品・雑貨",av:{t:"💬",bg:"linear-gradient(135deg,#8a5cf6,#e0559b)"},order:6,items:[]}
@@ -302,15 +302,19 @@ function byOrder(a,b){return (a.order||0)-(b.order||0);}
 /* ---------- order text ---------- */
 function buildText(sup){
   var d=draft[sup.id]||{}; var di=deliverInfo(d.deliver||"tomorrow");
-  var L=["お世話になっております。", di.rel+WD[di.d.getDay()]+"曜日", storeName()];
-  (sup.items||[]).forEach(function(item){
-    if(!itemForStore(item,CUR)) return;
-    var q=(d.qty&&d.qty[item.id])||0;
-    if(q>0){ L.push(item.name+q+(item.unit||"")); }
-  });
+  var items=[];
+  (sup.items||[]).forEach(function(item){ if(!itemForStore(item,CUR)) return; var q=(d.qty&&d.qty[item.id])||0; if(q>0) items.push(item.name+q+(item.unit||"")); });
+  if(sup.template==="email"){
+    // 中越鶏卵タイプ：1行・件名なし・曜日/絵文字なし・店名を文中に
+    return "お世話になっております。"+storeName()+"です。 "+di.rel+items.join("、")+"お願いいたします";
+  }
+  // 標準（SMS・複数行）
+  var L=["お世話になっております。", di.rel+WD[di.d.getDay()]+"曜日", storeName()].concat(items);
   L.push("お願いいたします🙇");
   return L.join("\n");
 }
+function supplierStores(s){ return (s.stores&&s.stores.length)?s.stores:["kaki","abura"]; }
+function supplierForStore(s,st){ return supplierStores(s).indexOf(st)>=0; }
 function currentText(sid){var d=draft[sid]||{};var sup=findSup(sid);return d.text!=null?d.text:buildText(sup);}
 function hasQty(sid){var d=draft[sid];if(!d||!d.qty)return false;for(var k in d.qty)if(d.qty[k]>0)return true;return false;}
 function sentToday(sid){return store.orders().some(function(o){return o.store===CUR&&o.supplierId===sid&&o.dateKey===dayKey(0)&&o.status==="sent";});}
@@ -393,7 +397,7 @@ function detailScreen(){
 
 /* ---------- 締め dashboard ---------- */
 function viewShime(){
-  var d=todayPlus(0); var sups=store.suppliers();
+  var d=todayPlus(0); var sups=store.suppliers().filter(function(s){return supplierForStore(s,CUR);});
   var sent=sups.filter(function(s){return sentToday(s.id);}).length;
   var closingDone=!!getClosing(CUR,dayKey(0));
   var ym=d.getFullYear()+"-"+(d.getMonth()+1)+"-";
@@ -422,7 +426,7 @@ function viewShime(){
 
 /* ---------- 発注 list ---------- */
 function viewOrder(){
-  var sups=store.suppliers().sort(byOrder);
+  var sups=store.suppliers().sort(byOrder).filter(function(s){return supplierForStore(s,CUR);});
   var dd=deliveryDate();
   var cards=sups.map(function(sup){var st=statusOf(sup);
     var closed=isClosedOn(sup,dd);
@@ -531,6 +535,8 @@ function avImg(sid,input){ ensureEditAv(sid); var f=input.files&&input.files[0];
 function masterDetail(sid){
   var s=findSup(sid); if(!s) return ""; ensureEditAv(sid);
   var cl=s.channel==="sms"?"携帯番号（SMS送信先）":s.channel==="email"?"メールアドレス":s.channel==="line"?"LINE（メモ・任意）":"Messenger（メモ・任意）";
+  var curScope=supplierStores(s).length>=2?"both":supplierStores(s)[0];
+  var curTmpl=s.template==="email"?"email":"sms";
   var head='<div class="card"><div class="suprow">'+C_avatar(s)+'<div class="supmid"><div class="supname">'+esc(s.name)+'</div><div class="supcat">'+esc(s.category||"")+'</div></div></div></div>';
   var swat=SWATCHES.map(function(h){return '<button type="button" onclick="avColor(\''+sid+'\',\''+h+'\')" style="width:30px;height:30px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--border);background:'+h+';cursor:pointer"></button>';}).join("");
   var avblock='<div class="field"><label>アイコン</label>'
@@ -546,6 +552,8 @@ function masterDetail(sid){
     +'<div class="field"><label>カテゴリ</label><input class="input" id="m_cat" value="'+esc(s.category||"")+'"></div>'
     +'<div class="field"><label>連絡ツール</label><select class="input" id="m_ch">'+Object.keys(CHANNELS).map(function(c){return '<option value="'+c+'" '+(c===s.channel?"selected":"")+'>'+CHANNELS[c]+'</option>';}).join("")+'</select></div>'
     +'<div class="field"><label>'+cl+'</label><input class="input" id="m_contact" value="'+esc(s.contact||"")+'"></div>'
+    +'<div class="field"><label>この業者を使う店舗</label><select class="input" id="m_stores"><option value="both"'+(curScope==="both"?" selected":"")+'>両方</option><option value="kaki"'+(curScope==="kaki"?" selected":"")+'>柿川亭のみ</option><option value="abura"'+(curScope==="abura"?" selected":"")+'>油ラボのみ</option></select></div>'
+    +'<div class="field"><label>文面スタイル</label><select class="input" id="m_template"><option value="sms"'+(curTmpl==="sms"?" selected":"")+'>標準（複数行）</option><option value="email"'+(curTmpl==="email"?" selected":"")+'>シンプル1行（中越鶏卵タイプ）</option></select></div>'
     +avblock
     +'<button class="btn primary" onclick="saveSupplier(\''+sid+'\')"><span>'+ic("check")+'</span>保存</button>'
     +'</div>';
@@ -626,7 +634,7 @@ function saveOrder(sid,status){var sup=findSup(sid);if(!sup)return;var os=store.
 function copyText(sid){var t=currentText(sid);if(navigator.clipboard)navigator.clipboard.writeText(t).then(function(){toast("本文をコピーしました");},function(){fbCopy(t);});else fbCopy(t);saveOrder(sid,"opened");}
 function fbCopy(t){var ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");toast("本文をコピーしました");}catch(e){}document.body.removeChild(ta);}
 function reuse(oid){var o=store.orders().filter(function(x){return x.id===oid;})[0];if(!o)return;draft[o.supplierId]={deliver:"tomorrow",qty:{},split:{},text:o.text};openDetail("order",o.supplierId);}
-function bulkSend(){var sups=store.suppliers().sort(byOrder);var first=sups.filter(function(s){return statusOf(s).k==="ready";})[0]||sups.filter(function(s){return hasQty(s.id)&&!sentToday(s.id);})[0];
+function bulkSend(){var sups=store.suppliers().sort(byOrder).filter(function(s){return supplierForStore(s,CUR);});var first=sups.filter(function(s){return statusOf(s).k==="ready";})[0]||sups.filter(function(s){return hasQty(s.id)&&!sentToday(s.id);})[0];
   if(!first){toast("先に数量を入力してください");return;}openDetail("order",first.id);}
 
 /* master */
@@ -644,6 +652,8 @@ function addClosedDate(sid){var v=el("cd_"+sid).value;if(!v){toast("日付を選
 function delClosedDate(sid,k){var a=store.suppliers();var s=a.filter(function(x){return x.id===sid;})[0];s.closedDates=(s.closedDates||[]).filter(function(x){return x!==k;});store.saveSuppliers(a);render();}
 function saveSupplier(sid){var a=store.suppliers();var s=a.filter(function(x){return x.id===sid;})[0];
   s.name=el("m_name").value.trim()||s.name;s.category=el("m_cat").value.trim();s.channel=el("m_ch").value;s.contact=el("m_contact").value.trim();
+  if(el("m_stores")){var sc=el("m_stores").value; s.stores=sc==="both"?["kaki","abura"]:[sc];}
+  if(el("m_template")) s.template=el("m_template").value;
   ensureEditAv(sid); if(el("m_av_t")) editAv.t=el("m_av_t").value.trim();
   var av={t:editAv.t||"",bg:editAv.bg||"#888888",img:editAv.img||""}; if(!av.img&&!av.t) av.t=s.name.slice(0,1); s.av=av;
   store.saveSuppliers(a);toast("保存しました");render();}
@@ -684,6 +694,13 @@ function migrate(){
     if(changed) store.saveSuppliers(a);
     done.mentsu_box=true; store.set(MK,done);
   }
+  if(!done.nakagoe_kaki){
+    var a2=store.suppliers(); var ch2=false;
+    a2.forEach(function(s){ if(s.name==="中越鶏卵"){ s.template="email"; s.stores=["kaki"]; if(!s.items||!s.items.length) s.items=[it("卵","kg")]; ch2=true; } });
+    if(ch2) store.saveSuppliers(a2);
+    done.nakagoe_kaki=true; store.set(MK,done);
+  }
+  if(!done.presets_v2){ store.set(LS.shoppresets,null); seedPresets(); done.presets_v2=true; store.set(MK,done); }
 }
 
 /* init */
