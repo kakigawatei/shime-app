@@ -124,6 +124,9 @@
   .stepper button:active{transform:scale(.9);}
   .stepper .qv{min-width:28px; text-align:center; font-weight:800; font-size:17px;}
   .qv.hot{color:var(--primary);}
+  .chk{min-width:120px; height:40px; padding:0 16px; border-radius:11px; border:1.5px solid var(--border); background:#fff; color:var(--sub); font-size:15px; font-weight:800; cursor:pointer; transition:transform .1s;}
+  .chk:active{transform:scale(.96);}
+  .chk.on{background:var(--success); border-color:var(--success); color:#fff;}
 
   /* ---------- fields ---------- */
   .field{margin-bottom:14px;}
@@ -295,6 +298,8 @@ function cCalc(c){ if(!c) return {salesTotal:0,customers:0};
   return { salesTotal:num(c.kenbaiSales)+num(c.anydeliSales)+cOtherTotal(c), customers:num(c.customers) }; }
 var cdraft={};
 function it(name,unit,stores){ return {id:uid(),name:name,unit:unit||"",stores:stores||["kaki","abura"]}; }
+function eggItem(){ return {id:uid(),name:"卵",unit:"kg",check:true,lot:5,stores:["kaki"]}; }
+function maruyamaItems(){ return [it("米油","缶"),it("割り箸","箱"),it("爪楊枝","箱"),it("おしぼり","箱"),it("プロメンテ（赤）","箱"),it("プロメンテ（青）","箱"),it("プロメンテ（緑）","箱"),it("のり用小袋","パック"),it("食洗機用洗剤","本"),it("テイクアウト用容器","セット"),it("エルベール","個"),it("ラップ","本")]; }
 function itemStores(item){ return (item.stores&&item.stores.length)?item.stores:["kaki","abura"]; }
 function itemForStore(item,st){ return itemStores(item).indexOf(st)>=0; }
 function dkeyOf(d){ return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
@@ -307,9 +312,9 @@ function seed(){
     {id:uid(),name:"ホクショク",channel:"sms",contact:"",category:"食材・調味料",av:{t:"ホ",bg:"#7a2230"},order:2,
       items:[it("豚骨のタレ","本"),it("煮干しのタレ","本"),it("塩タレ","本"),it("生姜醤油のタレ","本"),it("味噌だれ 赤(ビリー)","本"),it("ラー油","本"),it("柿川亭のタレ","ケース"),it("メンマ","ケース"),it("にんにく","個"),it("炭酸水","ケース")]},
     {id:uid(),name:"中越鶏卵",channel:"email",contact:"",category:"卵・鶏肉",av:{t:"🥚",bg:"#efe3bf"},order:3,template:"email",stores:["kaki"],
-      items:[it("卵","kg")]},
+      items:[eggItem()]},
     {id:uid(),name:"竹内農園",channel:"line",contact:"",category:"野菜・青果",av:{t:"🌿",bg:"#d7ebcf"},order:4,items:[it("マスタード（辛口）","パック"),it("マスタード（旨味）","パック")]},
-    {id:uid(),name:"マルヤマ包装",channel:"line",contact:"",category:"容器・包装資材",av:{t:"📦",bg:"#e4d6bd"},order:5,items:[it("米油","缶"),it("割り箸","箱"),it("爪楊枝","個"),it("おしぼり(赤)","箱"),it("おしぼり(青)","箱"),it("おしぼり(緑)","箱"),it("のり用小袋","パック"),it("食洗機用洗剤","本"),it("テイクアウト用容器","セット")]},
+    {id:uid(),name:"マルヤマ包装",channel:"line",contact:"",category:"容器・包装資材",av:{t:"📦",bg:"#e4d6bd"},order:5,items:maruyamaItems()},
     {id:uid(),name:"アルベーロ",channel:"messenger",contact:"",category:"備品・雑貨",av:{t:"💬",bg:"linear-gradient(135deg,#8a5cf6,#e0559b)"},order:6,items:[it("バジル","パック")]}
   ];
   store.saveSuppliers(s); return s;
@@ -491,6 +496,11 @@ function orderDetail(sid){
   var shownItems=(sup.items||[]).filter(function(item){return itemForStore(item,CUR);});
   var items = shownItems.length ? '<div class="card cardpad"><label class="lbl-mini">数量（'+esc(storeName())+'）</label><div class="items">'+shownItems.map(function(item){
       var q=d.qty[item.id]||0;
+      if(item.check){
+        var lot=item.lot||1; var on=q>0;
+        return '<div class="irow"><div class="iname">'+esc(item.name)+'<span class="iunit">'+esc(lot+(item.unit||"")+'／1ロット')+'</span></div>'
+          +'<button class="chk'+(on?' on':'')+'" id="q_'+sid+'_'+item.id+'" onclick="toggleItem(\''+sid+'\',\''+item.id+'\','+lot+')">'+(on?'✓ 注文する':'注文しない')+'</button></div>';
+      }
       return '<div class="irow"><div class="iname">'+esc(item.name)+'<span class="iunit">'+esc(item.unit||"")+'</span></div>'
         +'<div class="stepper"><button onclick="qty(\''+sid+'\',\''+item.id+'\',-1)">−</button><span class="qv'+(q>0?' hot':'')+'" id="q_'+sid+'_'+item.id+'">'+q+'</span><button onclick="qty(\''+sid+'\',\''+item.id+'\',1)">＋</button></div></div>';
     }).join("")+'</div></div>'
@@ -659,6 +669,8 @@ function histCard(n){
 function setDeliver(sid,k){draft[sid]=draft[sid]||{qty:{},split:{}};draft[sid].deliver=k;draft[sid].text=null;render();}
 function qty(sid,iid,delta){draft[sid]=draft[sid]||{deliver:"tomorrow",qty:{},split:{}};var v=(draft[sid].qty[iid]||0)+delta;if(v<0)v=0;draft[sid].qty[iid]=v;draft[sid].text=null;
   var qv=el("q_"+sid+"_"+iid);if(qv){qv.textContent=v;qv.classList.toggle("hot",v>0);}var ta=el("msg_"+sid);if(ta)ta.value=buildText(findSup(sid));}
+function toggleItem(sid,iid,lot){draft[sid]=draft[sid]||{deliver:"tomorrow",qty:{},split:{}};var on=(draft[sid].qty[iid]||0)>0;var v=on?0:(lot||1);draft[sid].qty[iid]=v;draft[sid].text=null;
+  var b=el("q_"+sid+"_"+iid);if(b){b.classList.toggle("on",v>0);b.textContent=v>0?"✓ 注文する":"注文しない";}var ta=el("msg_"+sid);if(ta)ta.value=buildText(findSup(sid));}
 function toggleSplit(sid,iid){draft[sid]=draft[sid]||{deliver:"tomorrow",qty:{},split:{}};var sr=el("sr_"+sid+"_"+iid);
   if(draft[sid].split[iid]==null){draft[sid].split[iid]=0;if(sr)sr.classList.add("on");}else{delete draft[sid].split[iid];if(sr)sr.classList.remove("on");}
   draft[sid].text=null;var ta=el("msg_"+sid);if(ta)ta.value=buildText(findSup(sid));}
@@ -737,7 +749,7 @@ function migrate(){
   }
   if(!done.nakagoe_kaki){
     var a2=store.suppliers(); var ch2=false;
-    a2.forEach(function(s){ if(s.name==="中越鶏卵"){ s.template="email"; s.stores=["kaki"]; if(!s.items||!s.items.length) s.items=[it("卵","kg")]; ch2=true; } });
+    a2.forEach(function(s){ if(s.name==="中越鶏卵"){ s.template="email"; s.stores=["kaki"]; if(!s.items||!s.items.length) s.items=[eggItem()]; ch2=true; } });
     if(ch2) store.saveSuppliers(a2);
     done.nakagoe_kaki=true; store.set(MK,done);
   }
@@ -753,7 +765,7 @@ function migrate(){
     a3.forEach(function(s){
       if(s.name==="竹内農園"&&(!s.items||!s.items.length)){ s.items=[it("マスタード（辛口）","パック"),it("マスタード（旨味）","パック")]; ch3=true; }
       if(s.name==="アルベーロ"&&(!s.items||!s.items.length)){ s.items=[it("バジル","パック")]; ch3=true; }
-      if(s.name==="マルヤマ包装"&&(!s.items||!s.items.length)){ s.items=[it("米油","缶"),it("割り箸","箱"),it("爪楊枝","個"),it("おしぼり(赤)","箱"),it("おしぼり(青)","箱"),it("おしぼり(緑)","箱"),it("のり用小袋","パック"),it("食洗機用洗剤","本"),it("テイクアウト用容器","セット")]; ch3=true; }
+      if(s.name==="マルヤマ包装"&&(!s.items||!s.items.length)){ s.items=maruyamaItems(); ch3=true; }
     });
     if(ch3) store.saveSuppliers(a3);
     done.line_items_v1=true; store.set(MK,done);
@@ -763,6 +775,18 @@ function migrate(){
     a5.forEach(function(s){ if(s.name==="竹内農園"){ s.items=[it("マスタード（辛口）","パック"),it("マスタード（旨味）","パック")]; ch5=true; } });
     if(ch5) store.saveSuppliers(a5);
     done.takeuchi_items_v2=true; store.set(MK,done);
+  }
+  if(!done.egg_check_v1){
+    var a6=store.suppliers(); var ch6=false;
+    a6.forEach(function(s){ if(s.name==="中越鶏卵"){ s.items=[eggItem()]; ch6=true; } });
+    if(ch6) store.saveSuppliers(a6);
+    done.egg_check_v1=true; store.set(MK,done);
+  }
+  if(!done.maruyama_items_v2){
+    var a7=store.suppliers(); var ch7=false;
+    a7.forEach(function(s){ if(s.name==="マルヤマ包装"){ s.items=maruyamaItems(); ch7=true; } });
+    if(ch7) store.saveSuppliers(a7);
+    done.maruyama_items_v2=true; store.set(MK,done);
   }
 }
 
