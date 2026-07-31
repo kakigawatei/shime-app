@@ -342,7 +342,7 @@ function renderHeader(){
   }
 }
 function renderTabbar(){
-  var tabs=[["shime","締め","clipboard"],["order","発注","send"],["master","マスタ","bag"],["shop","買い出し","cart"]];
+  var tabs=[["shime","締め","clipboard"],["order","発注","send"],["shop","買い出し","cart"],["master","マスタ","bag"]];
   el("tabbar").innerHTML=tabs.map(function(t){
     return '<button class="'+(STATE.tab===t[0]&&!STATE.detail?"on":"")+'" onclick="go(\''+t[0]+'\')">'+ic(t[2])+'<span>'+t[1]+'</span></button>';
   }).join("");
