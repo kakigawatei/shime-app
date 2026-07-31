@@ -269,7 +269,7 @@ function seed(){
     {id:uid(),name:"めんつう",channel:"sms",contact:"",category:"ラーメン麺",av:{t:"め",bg:"#243a6b"},order:1,
       items:[it("太麺","箱"),it("細麺","箱"),it("グルテンフリー","箱")]},
     {id:uid(),name:"ホクショク",channel:"sms",contact:"",category:"食材・調味料",av:{t:"ホ",bg:"#7a2230"},order:2,
-      items:[it("豚骨のタレ","本"),it("柿川亭のタレ","ケース",["kaki"]),it("メンマ","ケース"),it("にんにく","個")]},
+      items:[it("豚骨のタレ","本"),it("煮干しのタレ","本"),it("塩タレ","本"),it("生姜醤油のタレ","本"),it("味噌だれ 赤(ビリー)","本"),it("ラー油","本"),it("柿川亭のタレ","ケース"),it("メンマ","ケース"),it("にんにく","個"),it("炭酸水","ケース")]},
     {id:uid(),name:"中越鶏卵",channel:"email",contact:"",category:"卵・鶏肉",av:{t:"🥚",bg:"#efe3bf"},order:3,template:"email",stores:["kaki"],
       items:[it("卵","kg")]},
     {id:uid(),name:"竹内農園",channel:"line",contact:"",category:"野菜・青果",av:{t:"🌿",bg:"#d7ebcf"},order:4,items:[it("マスタード","パック"),it("辛口","パック"),it("マージ","パック")]},
@@ -701,6 +701,12 @@ function migrate(){
     done.nakagoe_kaki=true; store.set(MK,done);
   }
   if(!done.presets_v2){ store.set(LS.shoppresets,null); seedPresets(); done.presets_v2=true; store.set(MK,done); }
+  if(!done.hokushoku_items_v1){
+    var a4=store.suppliers(); var ch4=false;
+    a4.forEach(function(s){ if(s.name==="ホクショク"){ s.items=[it("豚骨のタレ","本"),it("煮干しのタレ","本"),it("塩タレ","本"),it("生姜醤油のタレ","本"),it("味噌だれ 赤(ビリー)","本"),it("ラー油","本"),it("柿川亭のタレ","ケース"),it("メンマ","ケース"),it("にんにく","個"),it("炭酸水","ケース")]; ch4=true; } });
+    if(ch4) store.saveSuppliers(a4);
+    done.hokushoku_items_v1=true; store.set(MK,done);
+  }
   if(!done.line_items_v1){
     var a3=store.suppliers(); var ch3=false;
     a3.forEach(function(s){
