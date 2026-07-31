@@ -321,7 +321,7 @@ function seed(){
 }
 
 /* ---------- state ---------- */
-var STATE = { tab:"order", detail:null }; // detail:{view:'order'|'master', sid}
+var STATE = { tab:"kaikei", detail:null }; // detail:{view:'order'|'master', sid}
 var CUR = store.get(LS.store,"kaki");
 var MYNAME = store.get(LS.name,"");
 var draft = {}; // sid -> {deliver, qty:{}, split:{}, text}
@@ -415,7 +415,7 @@ function renderHeader(){
   }
 }
 function renderTabbar(){
-  var tabs=[["shime","締め","clipboard"],["order","発注","send"],["shop","買い出し","cart"],["master","マスタ","bag"]];
+  var tabs=[["kaikei","会計","clipboard"],["order","発注","send"],["shop","買い出し","cart"],["master","マスタ","bag"]];
   el("tabbar").innerHTML=tabs.map(function(t){
     return '<button class="'+(STATE.tab===t[0]&&!STATE.detail?"on":"")+'" onclick="go(\''+t[0]+'\')">'+ic(t[2])+'<span>'+t[1]+'</span></button>';
   }).join("");
@@ -426,18 +426,17 @@ function openDetail(view,sid){STATE.detail={view:view,sid:sid};render();}
 function closeDetail(){STATE.detail=null;render();}
 
 function tabScreen(){
-  if(STATE.tab==="shime")return viewShime();
+  if(STATE.tab==="kaikei")return viewKaikei();
   if(STATE.tab==="order")return viewOrder();
   if(STATE.tab==="master")return viewMaster();
   return viewShop();
 }
 function detailScreen(){
-  if(STATE.detail.view==="closing") return closingDetail();
   return STATE.detail.view==="order"? orderDetail(STATE.detail.sid) : masterDetail(STATE.detail.sid);
 }
 
-/* ---------- 締め dashboard ---------- */
-function viewShime(){
+/* ---------- 会計タブ（開いた瞬間に入力フォーム） ---------- */
+function viewKaikei(){
   var d=todayPlus(0); var sups=store.suppliers().filter(function(s){return supplierForStore(s,CUR);});
   var sent=sups.filter(function(s){return sentToday(s.id);}).length;
   var closingDone=!!getClosing(CUR,dayKey(0));
@@ -445,23 +444,23 @@ function viewShime(){
   var all=store.closing(); var recs=[]; for(var k in all){var r=all[k]; if(r.store===CUR&&(""+r.date).indexOf(ym)===0)recs.push(r);}
   var mSales=0,mCust=0; recs.forEach(function(r){mSales+=num(r.salesTotal);mCust+=num(r.customersCalc);});
   var avg=mCust>0?Math.round(mSales/mCust):0;
+  var head=C_sec("clipboard","会計入力")
+    +'<div class="lead" style="display:flex;align-items:center;justify-content:space-between">'
+    +'<span>'+storeName()+' ・ '+(d.getMonth()+1)+'/'+d.getDate()+'（'+WD[d.getDay()]+'）</span>'
+    +'<span class="status '+(closingDone?"st-sent":"st-none")+'">'+(closingDone?"入力済":"未入力")+'</span></div>';
+  var banner=(sent<sups.length)
+    ? '<div class="card cardpad" style="display:flex;align-items:center;justify-content:space-between;gap:10px"><span>発注がまだの業者があります（'+sent+' / '+sups.length+'）</span><button class="btn sec" style="width:auto;padding:8px 14px" onclick="go(\'order\')"><span>'+ic("send")+'</span>発注へ</button></div>'
+    : '';
   var summary='<div class="card cardpad"><div style="display:flex;align-items:center;justify-content:space-between"><label class="lbl-mini" style="margin:0">今月の速報（'+storeName()+'）</label><span class="pill" style="background:#fff3d9;color:#b8860b">速報</span></div>'
     +'<div style="display:flex;gap:10px;text-align:center;margin-top:12px">'
     +'<div style="flex:1"><div style="font-size:21px;font-weight:800">'+yen(mSales)+'</div><div class="cwho">売上</div></div>'
     +'<div style="flex:1"><div style="font-size:21px;font-weight:800">'+mCust+'</div><div class="cwho">客数</div></div>'
     +'<div style="flex:1"><div style="font-size:21px;font-weight:800">'+yen(avg)+'</div><div class="cwho">客単価</div></div></div>'
     +'<div class="cwho" style="margin-top:10px">締めアプリ入力ベースの速報（'+recs.length+'日ぶん）。台帳(joe)との突き合わせは後日追加。</div></div>';
-  var steps='<div class="steprow"><div class="stl"><span class="stnum">1</span>会計入力（券売機・anydeli・客数）</div><span class="status '+(closingDone?"st-sent":"st-none")+'">'+(closingDone?"入力済":"未入力")+'</span></div>'
-    +'<div class="steprow soon"><div class="stl"><span class="stnum">2</span>仕入記録</div><span class="badge">近日</span></div>'
-    +'<div class="steprow"><div class="stl"><span class="stnum">3</span>発注</div><span class="status '+(sent===sups.length&&sent>0?"st-sent":"st-input")+'">'+sent+' / '+sups.length+' 件</span></div>';
-  var list=sups.sort(byOrder).map(function(s){var st=statusOf(s);
-    return '<div class="suprow" style="padding:14px 16px;border-top:1px solid var(--border)"><div style="flex:1;font-weight:600">'+esc(s.name)+'</div>'+C_status(st)+'</div>';}).join("");
-  return C_sec("clipboard","今日の締め")
-    +'<div class="lead">'+storeName()+' ・ '+(d.getMonth()+1)+'/'+d.getDate()+'（'+WD[d.getDay()]+'）</div>'
-    +summary
-    +'<div class="card mt">'+steps+'</div>'
-    +'<div class="btnrow" style="margin-top:8px"><button class="btn primary" onclick="openDetail(\'closing\')"><span>'+ic("clipboard")+'</span>会計入力</button><button class="btn sec" onclick="go(\'order\')"><span>'+ic("send")+'</span>発注</button></div>'
-    +'<div class="sec mt" style="margin-bottom:14px"><h2 style="font-size:var(--fs-sec)">今日の発注状況</h2></div><div class="card">'+list+'</div>'
+  return head
+    + closingForm()
+    + banner
+    +'<div class="sec mt" style="margin-bottom:14px"><h2 style="font-size:var(--fs-sec)">今月の速報</h2></div>'+summary
     +'<div class="sec mt" style="margin-bottom:14px"><h2 style="font-size:var(--fs-sec)">最近の履歴</h2></div>'+ histCard(6);
 }
 
@@ -523,15 +522,14 @@ function orderDetail(sid){
 }
 function segBtn(sid,k,label){var d=draft[sid];var on=(d&&d.deliver||"tomorrow")===k;return '<button class="'+(on?"on":"")+'" onclick="setDeliver(\''+sid+'\',\''+k+'\')">'+label+'</button>';}
 
-/* ---------- 会計入力（Phase2a） ---------- */
-function closingDetail(){
+/* ---------- 会計入力フォーム（Phase2a・会計タブ内） ---------- */
+function closingForm(){
   var dk=dayKey(0); var key=closingKey(CUR,dk); var d=todayPlus(0);
   if(!cdraft[key]) cdraft[key]=Object.assign({kenbaiSales:"",anydeliSales:"",other:[],customers:""}, getClosing(CUR,dk)||{});
   var c=cdraft[key]; if(!c.other) c.other=[]; var calc=cCalc(c);
   function f(field,label){ return '<div class="field"><label>'+label+'</label><div style="display:flex;align-items:center;gap:8px"><input class="input" type="number" inputmode="decimal" id="c_'+field+'" value="'+esc(c[field]==null?"":c[field])+'" oninput="cset(\''+field+'\',this.value)"><span class="iunit" style="min-width:24px">円</span></div></div>'; }
   var others=(c.other||[]).map(function(o,i){ return '<div class="addrow" style="margin-top:8px"><input class="input" id="co_l_'+i+'" value="'+esc(o.label||"")+'" placeholder="内容（例：大盛り変更）" oninput="cOtherSet('+i+',\'label\',this.value)"><input class="input" type="number" inputmode="decimal" value="'+esc(o.amount==null?"":o.amount)+'" placeholder="金額" style="max-width:96px" oninput="cOtherSet('+i+',\'amount\',this.value)"><button class="del" style="padding:0 8px;font-size:20px" onclick="cOtherDel('+i+')">×</button></div>'; }).join("");
-  return '<div class="card"><div class="suprow"><div class="avatar" style="background:var(--primary)">'+ic("clipboard")+'</div><div class="supmid"><div class="supname">会計入力</div><div class="supcat">'+esc(storeName())+' ・ '+(d.getMonth()+1)+'/'+d.getDate()+'（'+WD[d.getDay()]+'）</div></div></div></div>'
-    +'<div class="card cardpad">'+f("kenbaiSales","券売機売上")+f("anydeliSales","anydeli（エニデリ）売上")+'</div>'
+  return '<div class="card cardpad">'+f("kenbaiSales","券売機売上")+f("anydeliSales","anydeli（エニデリ）売上")+'</div>'
     +'<div class="card cardpad"><label class="lbl-mini">その他売上（現金など・明細）</label>'
       +'<div class="cwho" style="margin-bottom:2px">券売機以外でもらった売上（例：大盛り変更 +50円／瓶ビール）。何件でも追加OK</div>'
       +others
@@ -552,7 +550,7 @@ function cOtherDel(i){ var c=cdraft[cKeyNow()]; if(c&&c.other){ c.other.splice(i
 function saveClosingRecord(){ var dk=dayKey(0); var key=closingKey(CUR,dk); var c=cdraft[key]||{}; var calc=cCalc(c);
   var other=(c.other||[]).filter(function(o){return (o.label&&(""+o.label).trim())||num(o.amount);});
   var all=store.closing(); all[key]=Object.assign({},c,{store:CUR,date:dk,other:other,salesTotal:calc.salesTotal,customersCalc:calc.customers,inputBy:MYNAME,updatedAt:Date.now()}); store.saveClosing(all);
-  toast("保存しました"); closeDetail(); }
+  toast("保存しました"); render(); }
 
 /* ---------- マスタ ---------- */
 function viewMaster(){
