@@ -487,13 +487,9 @@ function viewOrder(){
     var extra=(closed?'<span class="status" style="background:#fdecec;color:#c0392b">明日休み</span>':'')+C_status(st);
     return C_supcard(sup,"openDetail('order','"+sup.id+"')",extra);
   }).join("");
-  var ready=sups.filter(function(s){return statusOf(s).k==="ready";}).length;
-  var bulk='<a class="btn primary big mt" style="cursor:pointer" onclick="bulkSend()"><span>'+ic("send")+'</span>'
-    +'<span class="lbl"><span>すべての発注を送信する</span><span class="sub">送信ボタンをまとめて開きます'+(ready?'（準備OK '+ready+'件）':'')+'</span></span>'
-    +'<span class="chevend">'+ic("chev")+'</span></a>';
   return C_sec("download","発注 — "+storeName())
-    +'<div class="lead">各業者に数量を入れて送信します。SMS・LINE・メールは本文入りで開き、最後に送信ボタンを押すだけ。同じ業者でもう一方の店舗ぶんは上のタブで切替できます。</div>'
-    +cards+bulk;
+    +'<div class="lead">各業者に数量を入れて送信します。業者ごとに開いて、1件ずつ送信してください。SMS・LINE・メールは本文入りで開き、最後に送信ボタンを押すだけ。同じ業者でもう一方の店舗ぶんは上のタブで切替できます。</div>'
+    +cards;
 }
 
 /* ---------- 発注 detail ---------- */
@@ -702,8 +698,6 @@ function saveOrder(sid,status){var sup=findSup(sid);if(!sup)return;var os=store.
 function copyText(sid){var t=liveText(sid);if(navigator.clipboard)navigator.clipboard.writeText(t).then(function(){toast("本文をコピーしました");},function(){fbCopy(t);});else fbCopy(t);saveOrder(sid,"opened");}
 function fbCopy(t){var ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");toast("本文をコピーしました");}catch(e){}document.body.removeChild(ta);}
 function reuse(oid){var o=store.orders().filter(function(x){return x.id===oid;})[0];if(!o)return;draft[o.supplierId]={deliver:"tomorrow",qty:{},split:{},text:o.text};openDetail("order",o.supplierId);}
-function bulkSend(){var sups=store.suppliers().sort(byOrder).filter(function(s){return supplierForStore(s,CUR);});var first=sups.filter(function(s){return statusOf(s).k==="ready";})[0]||sups.filter(function(s){return hasQty(s.id)&&!sentToday(s.id);})[0];
-  if(!first){toast("先に数量を入力してください");return;}openDetail("order",first.id);}
 
 /* master */
 function storeTag(item){var st=itemStores(item);if(st.length>=2)return C_pill("両方","ch-line");return C_pill(STORES[st[0]]?STORES[st[0]].name:st[0],"ch-sms");}
