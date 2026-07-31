@@ -359,6 +359,7 @@ var cdraft={};
 function it(name,unit,stores){ return {id:uid(),name:name,unit:unit||"",stores:stores||["kaki","abura"]}; }
 function eggItem(){ return {id:uid(),name:"卵",unit:"kg",check:true,lot:5,stores:["kaki"]}; }
 function maruyamaItems(){ return [it("米油","缶"),it("割り箸","箱"),it("爪楊枝","箱"),it("おしぼり","箱"),it("プロメンテ（赤）","箱"),it("プロメンテ（青）","箱"),it("プロメンテ（緑）","箱"),it("のり用小袋","パック"),it("食洗機用洗剤","本"),it("テイクアウト用容器","セット"),it("エルベール","個"),it("ラップ","本")]; }
+function mentsuItems(){ return [it("太麺","箱"),it("細麺","箱"),it("グルテンフリー","箱"),it("冷凍12番150g","箱",["abura"]),it("冷凍12番225g","箱",["abura"]),it("冷凍16番","箱",["abura"])]; } /* 冷凍3種はアブララボのみ */
 function itemStores(item){ return (item.stores&&item.stores.length)?item.stores:["kaki","abura"]; }
 function itemForStore(item,st){ return itemStores(item).indexOf(st)>=0; }
 function dkeyOf(d){ return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
@@ -367,7 +368,7 @@ function isClosedOn(sup,d){ if(!sup||!d) return false; if((sup.closedWeekdays||[
 function seed(){
   var s=[
     {id:uid(),name:"めんつう",channel:"sms",contact:"",category:"ラーメン麺",av:{t:"め",bg:"#243a6b"},order:1,
-      items:[it("太麺","箱"),it("細麺","箱"),it("グルテンフリー","箱")]},
+      items:mentsuItems()},
     {id:uid(),name:"ホクショク",channel:"sms",contact:"",category:"食材・調味料",av:{t:"ホ",bg:"#7a2230"},order:2,
       items:[it("豚骨のタレ","本"),it("煮干しのタレ","本"),it("塩タレ","本"),it("生姜醤油のタレ","本"),it("味噌だれ 赤(ビリー)","本"),it("ラー油","本"),it("柿川亭のタレ","ケース"),it("メンマ","ケース"),it("にんにく","個"),it("炭酸水","ケース")]},
     {id:uid(),name:"中越鶏卵",channel:"email",contact:"",category:"卵・鶏肉",av:{t:"🥚",bg:"#efe3bf"},order:3,template:"email",stores:["kaki"],
@@ -871,6 +872,12 @@ function migrate(){
     });
     if(chA) store.saveSuppliers(a10);
     done.flex_v2=true; store.set(MK,done);
+  }
+  if(!done.mentsu_abura_v1){
+    var a11=store.suppliers(); var chB=false;
+    a11.forEach(function(s){ if(s.name==="めんつう"){ s.items=mentsuItems(); chB=true; } });
+    if(chB) store.saveSuppliers(a11);
+    done.mentsu_abura_v1=true; store.set(MK,done);
   }
 }
 
