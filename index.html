@@ -303,7 +303,7 @@ function getClosing(st,dk){ return store.closing()[closingKey(st,dk)]||null; }
 function num(v){ v=parseFloat(v); return isNaN(v)?0:v; }
 function yen(n){ return "¥"+Math.round(n).toLocaleString("ja-JP"); }
 function cOtherTotal(c){ var s=0; (c.other||[]).forEach(function(o){ s+=num(o.amount); }); return s; }
-function cCash(c){ return num(c.kenbaiSales)+cOtherTotal(c); } /* 封筒に入れる現金＝券売機＋その他現金(エニデリ・クーポンを除く) */
+function cCash(c){ return num(c.kenbaiSales)+num(c.couponSales)+cOtherTotal(c); } /* 封筒に入れる金額＝エニデリ以外(券売機＋クーポン＋その他現金) */
 function cCalc(c){ if(!c) return {salesTotal:0,customers:0};
   return { salesTotal:num(c.kenbaiSales)+num(c.anydeliSales)+num(c.couponSales)+cOtherTotal(c), customers:num(c.customers) }; }
 var cdraft={};
@@ -554,7 +554,7 @@ function closingForm(){
     +'</div>'
     +'<div class="card cardpad"><label class="lbl-mini">自動計算</label>'
       +'<div class="irow"><div class="iname">売上合計</div><div style="font-weight:800;font-size:20px" id="c_total">'+yen(calc.salesTotal)+'</div></div>'
-      +'<div class="irow" style="background:var(--primary-l);margin:8px -6px 0;padding:12px 12px;border-radius:10px;border-bottom:0"><div class="iname" style="color:var(--primary-d);font-weight:700">封筒に入れる現金<br><span style="font-weight:500;font-size:12px;color:var(--sub)">エニデリ・クーポン以外（券売機＋その他現金）</span></div><div style="font-weight:800;font-size:22px;color:var(--primary)" id="c_cash">'+yen(cCash(c))+'</div></div>'
+      +'<div class="irow" style="background:var(--primary-l);margin:8px -6px 0;padding:12px 12px;border-radius:10px;border-bottom:0"><div class="iname" style="color:var(--primary-d);font-weight:700">封筒に入れる金額<br><span style="font-weight:500;font-size:12px;color:var(--sub)">エニデリ以外（券売機＋クーポン＋その他現金）</span></div><div style="font-weight:800;font-size:22px;color:var(--primary)" id="c_cash">'+yen(cCash(c))+'</div></div>'
     +'</div>'
     +'<button class="btn primary" onclick="saveClosingRecord()"><span>'+ic("check")+'</span>保存する</button>';
 }
