@@ -315,7 +315,7 @@ function seed(){
       items:[it("豚骨のタレ","本"),it("煮干しのタレ","本"),it("塩タレ","本"),it("生姜醤油のタレ","本"),it("味噌だれ 赤(ビリー)","本"),it("ラー油","本"),it("柿川亭のタレ","ケース"),it("メンマ","ケース"),it("にんにく","個"),it("炭酸水","ケース")]},
     {id:uid(),name:"中越鶏卵",channel:"email",contact:"",category:"卵・鶏肉",av:{t:"🥚",bg:"#efe3bf"},order:3,template:"email",stores:["kaki"],
       items:[eggItem()]},
-    {id:uid(),name:"マルヤマ包装",channel:"line",contact:"",category:"容器・包装資材",av:{t:"📦",bg:"#e4d6bd"},order:4,items:maruyamaItems()},
+    {id:uid(),name:"マルヤマ包装",channel:"line",contact:"",category:"容器・包装資材",av:{t:"📦",bg:"#e4d6bd"},order:4,flexDeliver:true,items:maruyamaItems()},
     {id:uid(),name:"竹内農園",channel:"line",contact:"",category:"野菜・青果",av:{t:"🌿",bg:"#d7ebcf"},order:5,items:[it("マスタード（辛口）","パック"),it("マスタード（旨味）","パック")]},
     {id:uid(),name:"アルベーロ",channel:"messenger",contact:"",category:"備品・雑貨",av:{t:"💬",bg:"linear-gradient(135deg,#8a5cf6,#e0559b)"},order:6,items:[it("バジル","パック")]}
   ];
@@ -347,12 +347,14 @@ function buildText(sup){
   var d=draft[sup.id]||{}; var di=deliverInfo(d.deliver||"tomorrow");
   var items=[];
   (sup.items||[]).forEach(function(item){ if(!itemForStore(item,CUR)) return; var q=(d.qty&&d.qty[item.id])||0; if(q>0) items.push(item.name+q+(item.unit||"")); });
+  var when = sup.flexDeliver ? "タイミングの良い時に" : (di.rel+WD[di.d.getDay()]+"曜日");
   if(sup.template==="email"){
     // 中越鶏卵タイプ：1行・件名なし・曜日/絵文字なし・店名を文中に
-    return "お世話になっております。"+storeName()+"です。 "+di.rel+items.join("、")+"お願いいたします";
+    var when1 = sup.flexDeliver ? "タイミングの良い時に" : di.rel;
+    return "お世話になっております。"+storeName()+"です。 "+when1+items.join("、")+"お願いいたします";
   }
   // 標準（SMS・複数行）
-  var L=["お世話になっております。", di.rel+WD[di.d.getDay()]+"曜日", storeName()].concat(items);
+  var L=["お世話になっております。", when, storeName()].concat(items);
   L.push("お願いいたします🙇");
   return L.join("\n");
 }
@@ -492,8 +494,8 @@ function orderDetail(sid){
   var head='<div class="card"><div class="suprow">'+C_avatar(sup)+'<div class="supmid"><div class="supname">'+esc(sup.name)+' '+C_pill(CHANNELS[sup.channel],"ch-"+sup.channel)+'</div><div class="supcat">'+esc(sup.category||"")+'</div></div>'+C_status(st)+'</div></div>';
   d.deliver="tomorrow";
   var _di=deliverInfo("tomorrow");
-  var seg='<div class="card cardpad" style="padding:14px 16px;display:flex;align-items:center;justify-content:space-between"><span class="lbl-mini" style="margin:0">お届け日</span>'
-    +'<span style="font-size:16px;font-weight:700">明日 '+(_di.d.getMonth()+1)+'/'+_di.d.getDate()+'（'+WD[_di.d.getDay()]+'）</span></div>';
+  var seg='<div class="card cardpad" style="padding:14px 16px;display:flex;align-items:center;justify-content:space-between"><span class="lbl-mini" style="margin:0">お届け</span>'
+    +'<span style="font-size:16px;font-weight:700">'+(sup.flexDeliver?"タイミングの良い時に":("明日 "+(_di.d.getMonth()+1)+'/'+_di.d.getDate()+'（'+WD[_di.d.getDay()]+'）'))+'</span></div>';
   var shownItems=(sup.items||[]).filter(function(item){return itemForStore(item,CUR);});
   var items = shownItems.length ? '<div class="card cardpad"><label class="lbl-mini">数量（'+esc(storeName())+'）</label><div class="items">'+shownItems.map(function(item){
       var q=d.qty[item.id]||0;
@@ -506,7 +508,7 @@ function orderDetail(sid){
         +'<div class="stepper"><button onclick="qty(\''+sid+'\',\''+item.id+'\',-1)">−</button><span class="qv'+(q>0?' hot':'')+'" id="q_'+sid+'_'+item.id+'">'+q+'</span><button onclick="qty(\''+sid+'\',\''+item.id+'\',1)">＋</button></div></div>';
     }).join("")+'</div></div>'
     : '<div class="card cardpad empty">'+esc(storeName())+'向けの品目が未登録です。<span class="link" onclick="openDetail(\'master\',\''+sid+'\')">マスタで追加</span></div>';
-  var dd=deliveryDate(); var closed=isClosedOn(sup,dd);
+  var dd=deliveryDate(); var closed=sup.flexDeliver?false:isClosedOn(sup,dd);
   var warn = closed ? '<div class="warnbox"><div class="wt">⚠️ この業者は明日 '+(dd.getMonth()+1)+'/'+dd.getDate()+'（'+WD[dd.getDay()]+'）はお休みです</div><div class="ws">注文を受けられない日のため、発注の送信はできません。別の日に手配してください。</div></div>' : '';
   var text=d.text!=null?d.text:buildText(sup);
   var link=sendLink(sup,text);
@@ -794,6 +796,12 @@ function migrate(){
     a8.forEach(function(s){ if(ord[s.name]!=null&&s.order!==ord[s.name]){ s.order=ord[s.name]; ch8=true; } });
     if(ch8) store.saveSuppliers(a8);
     done.supplier_order_v2=true; store.set(MK,done);
+  }
+  if(!done.maruyama_flex_v1){
+    var a9=store.suppliers(); var ch9=false;
+    a9.forEach(function(s){ if(s.name==="マルヤマ包装"&&!s.flexDeliver){ s.flexDeliver=true; ch9=true; } });
+    if(ch9) store.saveSuppliers(a9);
+    done.maruyama_flex_v1=true; store.set(MK,done);
   }
 }
 
