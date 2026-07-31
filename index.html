@@ -332,7 +332,7 @@ function seed(){
 
 /* ---------- state ---------- */
 var STATE = { tab:"kaikei", detail:null }; // detail:{view:'order'|'master', sid}
-var CUR = store.get(LS.store,"kaki");
+var CUR = "kaki"; /* 起動時は常に柿川亭で開く(油ラボはセッション内で切替。杉本さん含め既定を柿川亭に統一) */
 var MYNAME = store.get(LS.name,"");
 var draft = {}; // sid -> {deliver, qty:{}, split:{}, text}
 
