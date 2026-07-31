@@ -183,6 +183,13 @@
   .toast{position:fixed; bottom:calc(96px + var(--sab)); left:50%; transform:translateX(-50%); background:#2a2a28; color:#fff; padding:12px 20px; border-radius:var(--r-pill); font-size:14px; font-weight:600; opacity:0; transition:opacity .2s; z-index:80; pointer-events:none;}
   .toast.on{opacity:.96;}
   .mt{margin-top:22px;}
+  .wdchip{width:40px;height:40px;border-radius:11px;border:1px solid var(--border);background:#fff;font-weight:800;font-size:14px;color:var(--sub);cursor:pointer;}
+  .wdchip.on{background:var(--error);color:#fff;border-color:var(--error);}
+  .datechip{display:inline-flex;align-items:center;gap:6px;background:#fdecec;color:#c0392b;font-weight:700;font-size:13px;padding:6px 10px;border-radius:var(--r-pill);margin:4px 6px 0 0;}
+  .datechip button{border:0;background:none;color:#c0392b;font-weight:800;cursor:pointer;font-size:15px;line-height:1;}
+  .warnbox{background:#fdecec;border:1px solid #f3caca;border-radius:var(--r-card);padding:16px;margin-bottom:14px;}
+  .warnbox .wt{color:var(--error);font-weight:800;font-size:15px;}
+  .warnbox .ws{color:#a33;font-size:13px;margin-top:5px;}
 </style>
 </head>
 <body>
@@ -236,6 +243,9 @@ var store = {
 function it(name,unit,stores){ return {id:uid(),name:name,unit:unit||"",stores:stores||["kaki","abura"]}; }
 function itemStores(item){ return (item.stores&&item.stores.length)?item.stores:["kaki","abura"]; }
 function itemForStore(item,st){ return itemStores(item).indexOf(st)>=0; }
+function dkeyOf(d){ return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
+function deliveryDate(){ return todayPlus(1); }
+function isClosedOn(sup,d){ if(!sup||!d) return false; if((sup.closedWeekdays||[]).indexOf(d.getDay())>=0) return true; return (sup.closedDates||[]).indexOf(dkeyOf(d))>=0; }
 function seed(){
   var s=[
     {id:uid(),name:"めんつう",channel:"sms",contact:"",category:"ラーメン麺",av:{t:"め",bg:"#243a6b"},order:1,
@@ -384,8 +394,11 @@ function viewShime(){
 /* ---------- 発注 list ---------- */
 function viewOrder(){
   var sups=store.suppliers().sort(byOrder);
+  var dd=deliveryDate();
   var cards=sups.map(function(sup){var st=statusOf(sup);
-    return C_supcard(sup,"openDetail('order','"+sup.id+"')",C_status(st));
+    var closed=isClosedOn(sup,dd);
+    var extra=(closed?'<span class="status" style="background:#fdecec;color:#c0392b">明日休み</span>':'')+C_status(st);
+    return C_supcard(sup,"openDetail('order','"+sup.id+"')",extra);
   }).join("");
   var ready=sups.filter(function(s){return statusOf(s).k==="ready";}).length;
   var bulk='<a class="btn primary big mt" style="cursor:pointer" onclick="bulkSend()"><span>'+ic("send")+'</span>'
@@ -413,16 +426,21 @@ function orderDetail(sid){
         +'<div class="stepper"><button onclick="qty(\''+sid+'\',\''+item.id+'\',-1)">−</button><span class="qv'+(q>0?' hot':'')+'" id="q_'+sid+'_'+item.id+'">'+q+'</span><button onclick="qty(\''+sid+'\',\''+item.id+'\',1)">＋</button></div></div>';
     }).join("")+'</div></div>'
     : '<div class="card cardpad empty">'+esc(storeName())+'向けの品目が未登録です。<span class="link" onclick="openDetail(\'master\',\''+sid+'\')">マスタで追加</span></div>';
+  var dd=deliveryDate(); var closed=isClosedOn(sup,dd);
+  var warn = closed ? '<div class="warnbox"><div class="wt">⚠️ この業者は明日 '+(dd.getMonth()+1)+'/'+dd.getDate()+'（'+WD[dd.getDay()]+'）はお休みです</div><div class="ws">注文を受けられない日のため、発注の送信はできません。別の日に手配してください。</div></div>' : '';
   var text=d.text!=null?d.text:buildText(sup);
   var link=sendLink(sup,text);
-  var sendBtn = link.href
-    ? '<a class="btn primary" href="'+link.href+'" onclick="markOpened(\''+sid+'\')"><span>'+ic("send")+'</span>'+link.label+'</a>'
-    : '<div class="btn disabled">'+link.label+'（マスタで'+link.need+'を登録）</div>';
+  var sendBtn = closed
+    ? '<div class="btn disabled"><span>'+ic("send")+'</span>お休みのため送信できません</div>'
+    : (link.href
+      ? '<a class="btn primary" href="'+link.href+'" onclick="markOpened(\''+sid+'\')"><span>'+ic("send")+'</span>'+link.label+'</a>'
+      : '<div class="btn disabled">'+link.label+'（マスタで'+link.need+'を登録）</div>');
   var prev='<div class="card cardpad"><label class="lbl-mini">送信プレビュー（タップで直接編集OK）</label>'
     +'<textarea class="input" id="msg_'+sid+'" oninput="editText(\''+sid+'\',this.value)">'+esc(text)+'</textarea></div>';
-  return head+seg+items+prev+sendBtn
-    +'<div class="btnrow"><button class="btn sec" onclick="copyText(\''+sid+'\')"><span>'+ic("copy")+'</span>本文コピー</button>'
-    +'<button class="btn ok" onclick="markSent(\''+sid+'\')"><span>'+ic("check")+'</span>送信した</button></div>';
+  var actions = closed ? ''
+    : '<div class="btnrow"><button class="btn sec" onclick="copyText(\''+sid+'\')"><span>'+ic("copy")+'</span>本文コピー</button>'
+      +'<button class="btn ok" onclick="markSent(\''+sid+'\')"><span>'+ic("check")+'</span>送信した</button></div>';
+  return head+warn+seg+items+prev+sendBtn+actions;
 }
 function segBtn(sid,k,label){var d=draft[sid];var on=(d&&d.deliver||"tomorrow")===k;return '<button class="'+(on?"on":"")+'" onclick="setDeliver(\''+sid+'\',\''+k+'\')">'+label+'</button>';}
 
@@ -482,7 +500,17 @@ function masterDetail(sid){
     +'<div class="addrow" style="margin-top:8px"><select class="input" id="asc_'+sid+'"><option value="both">両方の店舗</option><option value="kaki">柿川亭のみ</option><option value="abura">油ラボのみ</option></select><button onclick="addItem(\''+sid+'\')">追加</button></div>'
     +'<div class="cwho" style="margin-top:8px">※品目のタグをタップすると「両方／柿川亭／油ラボ」を切り替えられます</div>'
     +'</div>';
-  return head+form+items+'<div style="text-align:center;margin-top:8px"><button class="del" onclick="delSupplier(\''+sid+'\')">この業者を削除</button></div>';
+  var wd=s.closedWeekdays||[];
+  var wdchips=WD.map(function(w,i){return '<button class="wdchip '+(wd.indexOf(i)>=0?"on":"")+'" onclick="toggleClosedWd(\''+sid+'\','+i+')">'+w+'</button>';}).join("");
+  var cds=(s.closedDates||[]).slice().sort();
+  var cdchips=cds.length?cds.map(function(k){var pp=k.split("-");var dt=new Date(pp[0],pp[1]-1,pp[2]);return '<span class="datechip">'+pp[1]+'/'+pp[2]+'（'+WD[dt.getDay()]+'）<button onclick="delClosedDate(\''+sid+'\',\''+k+'\')">×</button></span>';}).join(""):'<span class="cwho">なし</span>';
+  var closedBlock='<div class="card cardpad"><label class="lbl-mini">お休み（受注できない日）</label>'
+    +'<div class="cwho" style="margin-bottom:8px">毎週の定休（曜日）※赤＝休み</div><div style="display:flex;gap:6px;flex-wrap:wrap">'+wdchips+'</div>'
+    +'<div class="cwho" style="margin:16px 0 6px">特定の休配日</div>'
+    +'<div class="addrow"><input type="date" class="input" id="cd_'+sid+'"><button onclick="addClosedDate(\''+sid+'\')">追加</button></div>'
+    +'<div style="margin-top:8px">'+cdchips+'</div>'
+    +'<div class="cwho" style="margin-top:10px">※発注のお届け日（翌日）が休みに当たると、発注画面で注意表示＆送信できなくなります</div></div>';
+  return head+form+items+closedBlock+'<div style="text-align:center;margin-top:8px"><button class="del" onclick="delSupplier(\''+sid+'\')">この業者を削除</button></div>';
 }
 
 /* ---------- 買い出し ---------- */
@@ -545,6 +573,9 @@ function cycleItemStore(sid,iid){var a=store.suppliers();var s=a.filter(function
   item.stores = cur==="abura,kaki" ? ["kaki"] : (cur==="kaki" ? ["abura"] : ["kaki","abura"]);
   store.saveSuppliers(a);render();}
 function delItem(sid,iid){var a=store.suppliers();var s=a.filter(function(x){return x.id===sid;})[0];s.items=(s.items||[]).filter(function(i){return i.id!==iid;});store.saveSuppliers(a);render();}
+function toggleClosedWd(sid,wd){var a=store.suppliers();var s=a.filter(function(x){return x.id===sid;})[0];s.closedWeekdays=s.closedWeekdays||[];var i=s.closedWeekdays.indexOf(wd);if(i>=0)s.closedWeekdays.splice(i,1);else s.closedWeekdays.push(wd);store.saveSuppliers(a);render();}
+function addClosedDate(sid){var v=el("cd_"+sid).value;if(!v){toast("日付を選択");return;}var pp=v.split("-");var k=parseInt(pp[0],10)+"-"+parseInt(pp[1],10)+"-"+parseInt(pp[2],10);var a=store.suppliers();var s=a.filter(function(x){return x.id===sid;})[0];s.closedDates=s.closedDates||[];if(s.closedDates.indexOf(k)<0)s.closedDates.push(k);store.saveSuppliers(a);render();}
+function delClosedDate(sid,k){var a=store.suppliers();var s=a.filter(function(x){return x.id===sid;})[0];s.closedDates=(s.closedDates||[]).filter(function(x){return x!==k;});store.saveSuppliers(a);render();}
 function saveSupplier(sid){var a=store.suppliers();var s=a.filter(function(x){return x.id===sid;})[0];
   s.name=el("m_name").value.trim()||s.name;s.category=el("m_cat").value.trim();s.channel=el("m_ch").value;s.contact=el("m_contact").value.trim();
   ensureEditAv(sid); if(el("m_av_t")) editAv.t=el("m_av_t").value.trim();
