@@ -1,5 +1,5 @@
 /* 締めアプリ service worker — アプリシェルをキャッシュ。データはlocalStorage（将来Firestore）。 */
-var CACHE_VERSION = "shime-v35";
+var CACHE_VERSION = "shime-v36";
 var SHELL = ["./", "./index.html", "./manifest.webmanifest"];
 
 self.addEventListener("install", function(e){

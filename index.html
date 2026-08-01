@@ -503,17 +503,24 @@ function detailScreen(){
 
 /* ---------- 会計タブ（開いた瞬間に入力フォーム） ---------- */
 function viewKaikei(){
-  var d=todayPlus(0); var sups=store.suppliers().filter(function(s){return supplierForStore(s,CUR);});
+  var d=todayPlus(cOff); var sups=store.suppliers().filter(function(s){return supplierForStore(s,CUR);});
   var sent=sups.filter(function(s){return sentToday(s.id);}).length;
-  var closingDone=!!getClosing(CUR,dayKey(0));
+  var closingDone=!!getClosing(CUR,dayKey(cOff));
   var ym=d.getFullYear()+"-"+(d.getMonth()+1)+"-";
   var all=store.closing(); var recs=[]; for(var k in all){var r=all[k]; if(r.store===CUR&&(""+r.date).indexOf(ym)===0)recs.push(r);}
   var mSales=0,mCust=0; recs.forEach(function(r){mSales+=num(r.salesTotal);mCust+=num(r.customersCalc);});
   var avg=mCust>0?Math.round(mSales/mCust):0;
+  var nav='<div style="display:flex;align-items:center;gap:8px">'
+    +'<button class="btn ghost" style="width:auto;padding:6px 12px" onclick="cSetOff(cOff-1)" '+(cOff<=-6?'disabled':'')+'>◀ 前日</button>'
+    +'<span style="font-weight:800">'+(d.getMonth()+1)+'/'+d.getDate()+'（'+WD[d.getDay()]+'）'+(cOff===0?'（今日）':'')+'</span>'
+    +'<button class="btn ghost" style="width:auto;padding:6px 12px" onclick="cSetOff(cOff+1)" '+(cOff>=0?'disabled':'')+'>翌日 ▶</button>'
+    +(cOff!==0?'<button class="btn ghost" style="width:auto;padding:6px 12px" onclick="cSetOff(0)">今日へ</button>':'')
+    +'</div>';
   var head=C_sec("clipboard","会計入力")
     +'<div class="lead" style="display:flex;align-items:center;justify-content:space-between">'
-    +'<span>'+storeName()+' ・ '+(d.getMonth()+1)+'/'+d.getDate()+'（'+WD[d.getDay()]+'）</span>'
-    +'<span class="status '+(closingDone?"st-sent":"st-none")+'">'+(closingDone?"入力済":"未入力")+'</span></div>';
+    +'<span>'+storeName()+'</span>'
+    +'<span class="status '+(closingDone?"st-sent":"st-none")+'">'+(closingDone?"入力済":"未入力")+'</span></div>'
+    +'<div class="card cardpad" style="margin-bottom:10px">'+nav+(cOff!==0?'<div class="cwho" style="margin-top:6px">過去日の入力モード：この日付の分として保存されます</div>':'')+'</div>';
   var banner=(sent<sups.length)
     ? '<div class="card cardpad" style="display:flex;align-items:center;justify-content:space-between;gap:10px"><span>発注がまだの業者があります（'+sent+' / '+sups.length+'）</span><button class="btn sec" style="width:auto;padding:8px 14px" onclick="go(\'order\')"><span>'+ic("send")+'</span>発注へ</button></div>'
     : '';
@@ -588,13 +595,15 @@ function orderDetail(sid){
 function segBtn(sid,k,label){var d=draft[sid];var on=(d&&d.deliver||"tomorrow")===k;return '<button class="'+(on?"on":"")+'" onclick="setDeliver(\''+sid+'\',\''+k+'\')">'+label+'</button>';}
 
 /* ---------- 会計入力フォーム（Phase2a・会計タブ内） ---------- */
+var cOff=0;  // 入力対象日: 0=今日, -1=昨日 …（入れ忘れの後日入力用 2026-08-01）
+function cSetOff(n){ cOff=Math.max(-6,Math.min(0,n)); render(); }
 function closingForm(){
-  var dk=dayKey(0); var key=closingKey(CUR,dk); var d=todayPlus(0);
+  var dk=dayKey(cOff); var key=closingKey(CUR,dk); var d=todayPlus(cOff);
   if(!cdraft[key]) cdraft[key]=Object.assign({kenbaiSales:"",anydeliSales:"",couponSales:"",other:[],customers:""}, getClosing(CUR,dk)||{});
   var c=cdraft[key]; if(!c.other) c.other=[]; var calc=cCalc(c);
   function f(field,label){ return '<div class="field"><label>'+label+'</label><div style="display:flex;align-items:center;gap:8px"><input class="input" type="number" inputmode="decimal" id="c_'+field+'" value="'+esc(c[field]==null?"":c[field])+'" oninput="cset(\''+field+'\',this.value)"><span class="iunit" style="min-width:24px">円</span></div></div>'; }
   var others=(c.other||[]).map(function(o,i){ return '<div class="addrow" style="margin-top:8px"><input class="input" id="co_l_'+i+'" value="'+esc(o.label||"")+'" placeholder="内容（例：大盛り変更）" oninput="cOtherSet('+i+',\'label\',this.value)"><input class="input" type="number" inputmode="decimal" value="'+esc(o.amount==null?"":o.amount)+'" placeholder="金額" style="max-width:96px" oninput="cOtherSet('+i+',\'amount\',this.value)"><button class="del" style="padding:0 8px;font-size:20px" onclick="cOtherDel('+i+')">×</button></div>'; }).join("");
-  return '<div class="card cardpad">'+f("kenbaiSales","券売機売上")+f("anydeliSales","anydeli売上")+f("couponSales","クーポン売上")+'</div>'
+  return '<div class="card cardpad">'+f("kenbaiSales","券売機売上")+f("anydeliSales","anydeli売上（キャッシュレス）")+f("couponSales","クーポン売上")+'</div>'
     +'<div class="card cardpad"><label class="lbl-mini">その他売上（現金など・明細）</label>'
       +'<div class="cwho" style="margin-bottom:2px">券売機以外でもらった売上（例：大盛り変更 +50円／瓶ビール）。何件でも追加OK</div>'
       +others
@@ -606,13 +615,13 @@ function closingForm(){
     +'</div>'
     +'<button class="btn primary" onclick="saveClosingRecord()"><span>'+ic("check")+'</span>保存する</button>';
 }
-function cKeyNow(){ return closingKey(CUR,dayKey(0)); }
+function cKeyNow(){ return closingKey(CUR,dayKey(cOff)); }
 function cRefreshTotal(){ var c=cdraft[cKeyNow()]||{}; var t=el("c_total"); if(t)t.textContent=yen(cCalc(c).salesTotal); var cc=el("c_cash"); if(cc)cc.textContent=yen(cCash(c)); }
 function cset(field,val){ var key=cKeyNow(); cdraft[key]=cdraft[key]||{other:[]}; cdraft[key][field]=val; cRefreshTotal(); }
 function cOtherSet(i,field,val){ var c=cdraft[cKeyNow()]; if(!c||!c.other||!c.other[i])return; c.other[i][field]=val; cRefreshTotal(); }
 function cOtherAdd(){ var key=cKeyNow(); cdraft[key]=cdraft[key]||{other:[]}; cdraft[key].other=cdraft[key].other||[]; cdraft[key].other.push({label:"",amount:""}); render(); }
 function cOtherDel(i){ var c=cdraft[cKeyNow()]; if(c&&c.other){ c.other.splice(i,1); render(); } }
-function saveClosingRecord(){ var dk=dayKey(0); var key=closingKey(CUR,dk); var c=cdraft[key]||{}; var calc=cCalc(c);
+function saveClosingRecord(){ var dk=dayKey(cOff); var key=closingKey(CUR,dk); var c=cdraft[key]||{}; var calc=cCalc(c);
   var other=(c.other||[]).filter(function(o){return (o.label&&(""+o.label).trim())||num(o.amount);});
   var all=store.closing(); all[key]=Object.assign({},c,{store:CUR,date:dk,other:other,salesTotal:calc.salesTotal,cashTotal:cCash(c),customersCalc:calc.customers,inputBy:MYNAME,updatedAt:Date.now()}); store.saveClosing(all);
   toast("保存しました"); render(); }
