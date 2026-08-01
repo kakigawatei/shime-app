@@ -177,6 +177,9 @@
   .addrow{display:flex; gap:8px; margin-top:10px;}
   .addrow .input{flex:1;}
   .addrow button{border:0; background:var(--primary); color:#fff; font-weight:800; border-radius:var(--r-md); padding:0 18px; cursor:pointer;}
+  .addrow .sgn{background:#fff; color:var(--sub); border:1.5px solid var(--border); font-size:20px; font-weight:800; padding:0; width:44px; flex:none;}
+  .addrow .sgn.neg{background:var(--error); color:#fff; border-color:var(--error);}
+  .input.neg{color:var(--error); font-weight:800;}
 
   /* ---------- modal ---------- */
   .modal{position:fixed; inset:0; background:rgba(20,20,18,.42); display:none; align-items:flex-end; justify-content:center; z-index:60;}
@@ -602,10 +605,11 @@ function closingForm(){
   if(!cdraft[key]) cdraft[key]=Object.assign({kenbaiSales:"",anydeliSales:"",couponSales:"",other:[],customers:""}, getClosing(CUR,dk)||{});
   var c=cdraft[key]; if(!c.other) c.other=[]; var calc=cCalc(c);
   function f(field,label){ return '<div class="field"><label>'+label+'</label><div style="display:flex;align-items:center;gap:8px"><input class="input" type="number" inputmode="decimal" id="c_'+field+'" value="'+esc(c[field]==null?"":c[field])+'" oninput="cset(\''+field+'\',this.value)"><span class="iunit" style="min-width:24px">円</span></div></div>'; }
-  var others=(c.other||[]).map(function(o,i){ return '<div class="addrow" style="margin-top:8px"><input class="input" id="co_l_'+i+'" value="'+esc(o.label||"")+'" placeholder="内容（例：大盛り変更）" oninput="cOtherSet('+i+',\'label\',this.value)"><input class="input" type="number" inputmode="decimal" value="'+esc(o.amount==null?"":o.amount)+'" placeholder="金額" style="max-width:96px" oninput="cOtherSet('+i+',\'amount\',this.value)"><button class="del" style="padding:0 8px;font-size:20px" onclick="cOtherDel('+i+')">×</button></div>'; }).join("");
+  var others=(c.other||[]).map(function(o,i){ var rf=cIsRefund(o); var av=(o.amount==null||o.amount==="")?"":(rf?""+Math.abs(num(o.amount)):o.amount);
+    return '<div class="addrow" style="margin-top:8px"><input class="input" id="co_l_'+i+'" value="'+esc(o.label||"")+'" placeholder="内容（例：大盛り変更）" oninput="cOtherSet('+i+',\'label\',this.value)"><button class="sgn'+(rf?' neg':'')+'" onclick="cOtherSign('+i+')">'+(rf?'−':'＋')+'</button><input class="input'+(rf?' neg':'')+'" type="number" inputmode="decimal" value="'+esc(av)+'" placeholder="金額" style="max-width:88px" oninput="cOtherSet('+i+',\'amount\',this.value)"><button class="del" style="padding:0 8px;font-size:20px" onclick="cOtherDel('+i+')">×</button></div>'; }).join("");
   return '<div class="card cardpad">'+f("kenbaiSales","券売機売上")+f("anydeliSales","anydeli売上（キャッシュレス）")+f("couponSales","クーポン売上")+'</div>'
     +'<div class="card cardpad"><label class="lbl-mini">その他売上（現金など・明細）</label>'
-      +'<div class="cwho" style="margin-bottom:2px">券売機以外でもらった売上（例：大盛り変更 +50円／瓶ビール）。何件でも追加OK</div>'
+      +'<div class="cwho" style="margin-bottom:2px">券売機以外でもらった売上（例：大盛り変更 +50円／瓶ビール）。何件でも追加OK。返金があった日は「＋」ボタンを押して「−」にするとマイナス（引き算）で入れられます</div>'
       +others
       +'<button class="btn ghost" style="margin-top:10px" onclick="cOtherAdd()"><span>'+ic("plus")+'</span>明細を追加</button>'
     +'</div>'
@@ -618,7 +622,14 @@ function closingForm(){
 function cKeyNow(){ return closingKey(CUR,dayKey(cOff)); }
 function cRefreshTotal(){ var c=cdraft[cKeyNow()]||{}; var t=el("c_total"); if(t)t.textContent=yen(cCalc(c).salesTotal); var cc=el("c_cash"); if(cc)cc.textContent=yen(cCash(c)); }
 function cset(field,val){ var key=cKeyNow(); cdraft[key]=cdraft[key]||{other:[]}; cdraft[key][field]=val; cRefreshTotal(); }
-function cOtherSet(i,field,val){ var c=cdraft[cKeyNow()]; if(!c||!c.other||!c.other[i])return; c.other[i][field]=val; cRefreshTotal(); }
+function cIsRefund(o){ return !!o.refund || num(o.amount)<0; }
+function cOtherSet(i,field,val){ var c=cdraft[cKeyNow()]; if(!c||!c.other||!c.other[i])return; var o=c.other[i];
+  if(field==="amount"&&val!==""&&cIsRefund(o)){ var a=parseFloat(val); if(!isNaN(a)) val=""+(-Math.abs(a)); }
+  o[field]=val; cRefreshTotal(); }
+function cOtherSign(i){ var c=cdraft[cKeyNow()]; if(!c||!c.other||!c.other[i])return; var o=c.other[i];
+  var rf=!cIsRefund(o); o.refund=rf;
+  if(o.amount!=null&&o.amount!==""){ var a=num(o.amount); o.amount=""+(rf?-Math.abs(a):Math.abs(a)); }
+  render(); }
 function cOtherAdd(){ var key=cKeyNow(); cdraft[key]=cdraft[key]||{other:[]}; cdraft[key].other=cdraft[key].other||[]; cdraft[key].other.push({label:"",amount:""}); render(); }
 function cOtherDel(i){ var c=cdraft[cKeyNow()]; if(c&&c.other){ c.other.splice(i,1); render(); } }
 function saveClosingRecord(){ var dk=dayKey(cOff); var key=closingKey(CUR,dk); var c=cdraft[key]||{}; var calc=cCalc(c);
