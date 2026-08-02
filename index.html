@@ -270,17 +270,27 @@ function fbAuth(){ if(fbTok&&Date.now()<fbExp)return Promise.resolve(fbTok); var
 function fsUrl(id){ return "https://firestore.googleapis.com/v1/projects/"+FB.projectId+"/databases/(default)/documents/shime_docs/"+id; }
 function cloudGet(id){ return fbAuth().then(function(t){return fetch(fsUrl(id),{headers:{Authorization:"Bearer "+t}});}).then(function(r){ if(r.status===404)return null; if(!r.ok)throw new Error("get "+r.status); return r.json(); }).then(function(d){ return (d&&d.fields&&d.fields.json)?d.fields.json.stringValue:null; }); }
 function cloudPut(id,jsonStr){ return fbAuth().then(function(t){return fetch(fsUrl(id)+"?updateMask.fieldPaths=json&updateMask.fieldPaths=ts",{method:"PATCH",keepalive:true,headers:{Authorization:"Bearer "+t,"Content-Type":"application/json"},body:JSON.stringify({fields:{json:{stringValue:jsonStr},ts:{integerValue:String(Date.now())}}})});}).then(function(r){if(!r.ok)throw new Error("put "+r.status);}); }
+/* dirtyフラグ: 「この端末の方が新しい」印。push成功まで消えない＝pullで古いクラウドに上書きされない(2026-08-02 会計入力消失の再発防止) */
+var DIRTY_KEY="shime_dirty";
+function getDirty(){ try{return JSON.parse(localStorage.getItem(DIRTY_KEY))||{};}catch(e){return {};} }
+function markDirty(id){ var d=getDirty(); d[id]=Date.now(); try{localStorage.setItem(DIRTY_KEY,JSON.stringify(d));}catch(e){} }
+function clearDirty(id){ var d=getDirty(); if(d[id]!=null){ delete d[id]; try{localStorage.setItem(DIRTY_KEY,JSON.stringify(d));}catch(e){} } }
 function cloudMark(lsKey){ if(!CLOUD_ON)return; var id=null; for(var k in CLOUD) if(CLOUD[k]===lsKey) id=k; if(!id)return;
-  setSync("同期中…"); clearTimeout(pushTimers[id]); pushTimers[id]=setTimeout(function(){ var v=localStorage.getItem(lsKey)||""; cloudPut(id,v).then(function(){setSync("同期済");}).catch(function(){setSync("後で同期");}); },700); }
-function flushPushes(){ for(var id in pushTimers){ if(pushTimers[id]){ clearTimeout(pushTimers[id]); pushTimers[id]=null; var v=localStorage.getItem(CLOUD[id])||""; cloudPut(id,v).catch(function(){}); } } } /* 保留中のpushを即送信(閉じる/リロード時のデータ喪失防止) */
+  markDirty(id);
+  setSync("同期中…"); clearTimeout(pushTimers[id]); pushTimers[id]=setTimeout(function(){ var v=localStorage.getItem(lsKey)||""; cloudPut(id,v).then(function(){clearDirty(id);setSync("同期済");}).catch(function(){setSync("後で同期");}); },700); }
+function flushPushes(){ for(var id in pushTimers){ if(pushTimers[id]){ clearTimeout(pushTimers[id]); pushTimers[id]=null; (function(i){ var v=localStorage.getItem(CLOUD[i])||""; cloudPut(i,v).then(function(){clearDirty(i);}).catch(function(){}); })(id); } } } /* 保留中のpushを即送信(閉じる/リロード時のデータ喪失防止) */
 function isEmptyData(s){ if(s==null||s==="") return true; try{var v=JSON.parse(s); if(v==null)return true; if(Array.isArray(v))return v.length===0; if(typeof v==="object")return Object.keys(v).length===0; return false;}catch(e){return false;} }
 function cloudPullAll(){ var ids=Object.keys(CLOUD);
   return Promise.all(ids.map(function(id){ return cloudGet(id).then(function(js){return {id:id,js:js};}).catch(function(){return {id:id,js:undefined};}); })).then(function(res){
-    var changed=false; res.forEach(function(r){ var lsKey=CLOUD[r.id];
+    var changed=false, dirty=getDirty(); res.forEach(function(r){ var lsKey=CLOUD[r.id];
       if(r.js===undefined){}
-      else if(r.js===null){ var local=localStorage.getItem(lsKey); if(local){ cloudPut(r.id,local).catch(function(){}); } }
+      else if(r.js===null){ var local=localStorage.getItem(lsKey); if(local){ cloudPut(r.id,local).then(function(){clearDirty(r.id);}).catch(function(){}); } }
       else { var cur=localStorage.getItem(lsKey);
-        if(cur!==r.js){
+        if(dirty[r.id]!=null && cur!=null && cur!==""){ /* この端末に未送信の新しい変更あり→pullで上書きせず、逆にローカルを送る */
+          if(cur!==r.js){ cloudPut(r.id,cur).then(function(){clearDirty(r.id);}).catch(function(){}); }
+          else { clearDirty(r.id); }
+        }
+        else if(cur!==r.js){
           if(isEmptyData(r.js) && !isEmptyData(cur)){ cloudPut(r.id,cur).catch(function(){}); } /* 空クラウドでローカルの実データを絶対に上書きしない→逆にローカルをpush */
           else { try{localStorage.setItem(lsKey,r.js);}catch(e){} changed=true; }
         }
@@ -315,12 +325,13 @@ var LEDGER={ id:"1cMfvuwBRc6tnKoeIPAgM5wGryUXyeV5fL2XPkoIcTT8", tabs:{kaki:"🍜
 var _ledgerCache={}; // store -> {ts, map}
 function csvParse(text){ var rows=[],row=[],f="",i=0,q=false,c; while(i<text.length){ c=text[i]; if(q){ if(c==='"'){ if(text[i+1]==='"'){f+='"';i++;} else q=false; } else f+=c; } else { if(c==='"')q=true; else if(c===','){row.push(f);f="";} else if(c==='\n'){row.push(f);rows.push(row);row=[];f="";} else if(c==='\r'){} else f+=c; } i++; } if(f.length||row.length){row.push(f);rows.push(row);} return rows; }
 function canonD(s){ var p=(""+s).split("-"); if(p.length<3) return ""; return (+p[0])+"-"+(+p[1])+"-"+(+p[2]); }
+function mny(v){ var s=(""+(v==null?"":v)).replace(/[¥￥,\s"]/g,""); var f=parseFloat(s); return isNaN(f)?0:f; } /* 台帳v3は¥,カンマ付き書式でgvizに出る */
 function fetchLedger(store){ // returns Promise(map: canonDate -> {kenbai,anydeli,coupon,uriage})
   var cc=_ledgerCache[store]; if(cc && (Date.now()-cc.ts)<120000) return Promise.resolve(cc.map);
   var tab=LEDGER.tabs[store]; if(!tab) return Promise.resolve({});
   return fetch("https://docs.google.com/spreadsheets/d/"+LEDGER.id+"/gviz/tq?tqx=out:csv&sheet="+encodeURIComponent(tab)).then(function(r){return r.text();}).then(function(t){
     var rows=csvParse(t), map={};
-    rows.forEach(function(row){ var d=(row[0]||"").trim(); if(!/^\d{4}-\d{2}-\d{2}$/.test(d)) return; map[canonD(d)]={kenbai:num(row[2]),anydeli:num(row[3]),coupon:num(row[5]),uriage:num(row[7])}; });
+    rows.forEach(function(row){ var d=(row[0]||"").trim(); if(!/^\d{4}-\d{2}-\d{2}$/.test(d)) return; map[canonD(d)]={kenbai:mny(row[2]),anydeli:mny(row[3]),coupon:mny(row[5]),uriage:mny(row[7])}; });
     _ledgerCache[store]={ts:Date.now(),map:map}; return map;
   });
 }
